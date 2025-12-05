@@ -110,7 +110,7 @@ def generate_land_use_area_by_level(ws, df_area: pd.DataFrame, attr_key: str) ->
 
     grade_order = get_grade_order(attr_key)
     range_desc = get_level_value_ranges(attr_key)
-    level_to_range = dict(zip(grade_order, range_desc))
+    level_to_range = dict(zip(grade_order, range_desc, strict=False))
 
     # 预处理数据
     df = df_area.copy()
@@ -214,7 +214,7 @@ def generate_town_area_by_level(ws, df_area: pd.DataFrame, attr_key: str) -> Non
 
     grade_order = get_grade_order(attr_key)
     range_desc = get_level_value_ranges(attr_key)
-    level_to_range = dict(zip(grade_order, range_desc))
+    level_to_range = dict(zip(grade_order, range_desc, strict=False))
 
     # 应用土地利用过滤（乡镇统计只统计耕地）
     df = df_area.copy()

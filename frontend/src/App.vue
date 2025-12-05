@@ -17,6 +17,7 @@
           <el-menu-item index="/upload">数据上传</el-menu-item>
           <el-menu-item index="/config">项目配置</el-menu-item>
           <el-menu-item index="/report">报告生成</el-menu-item>
+          <el-menu-item index="/data-manage">数据管理</el-menu-item>
         </el-menu>
       </el-header>
       <el-main class="app-main">

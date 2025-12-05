@@ -33,6 +33,12 @@ const routes = [
     name: 'AttributeProcess',
     component: () => import('@/views/AttributeProcess.vue'),
     meta: { title: '属性图处理' }
+  },
+  {
+    path: '/data-manage',
+    name: 'DataManage',
+    component: () => import('@/views/DataManageView.vue'),
+    meta: { title: '数据管理' }
   }
 ]
 
