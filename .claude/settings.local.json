@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chcp 65001)",
+      "Bash(python -c:*)",
+      "WebSearch",
+      "Bash(claude mcp add:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(pip install:*)",
+      "Bash(pip search:*)",
+      "Bash(pip index:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(ruff check:*)",
+      "Bash(ruff format:*)",
+      "Bash(python -m uvicorn:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
