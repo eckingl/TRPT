@@ -15,6 +15,9 @@ class RegionCreate(BaseModel):
     category: str = Field(..., description="大类")
     topic: str = Field(..., description="专题")
     item: str = Field(..., description="具体项目")
+    province: str | None = Field(None, description="省份代码")
+    city: str | None = Field(None, description="市代码")
+    county: str | None = Field(None, description="县/区名称")
 
 
 class RegionUpdate(BaseModel):
@@ -31,6 +34,9 @@ class RegionResponse(BaseModel):
     category: str
     topic: str
     item: str
+    province: str | None = None
+    city: str | None = None
+    county: str | None = None
     created_at: str
     updated_at: str
 
@@ -61,6 +67,9 @@ async def create_region(data: RegionCreate) -> RegionResponse:
             category=data.category,
             topic=data.topic,
             item=data.item,
+            province=data.province,
+            city=data.city,
+            county=data.county,
         )
         region = await db.get_region_by_id(region_id)
         if not region:

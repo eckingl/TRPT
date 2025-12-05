@@ -1,5 +1,14 @@
 <template>
   <div class="upload-page">
+    <!-- 当前选择信息 -->
+    <div v-if="store.hasSelection" class="current-selection">
+      <el-tag>{{ store.selectedCategory === 'soil_survey' ? '土壤普查' : '耕地质量' }}</el-tag>
+      <el-icon><ArrowRight /></el-icon>
+      <el-tag type="success">{{ getTopicName() }}</el-tag>
+      <el-icon><ArrowRight /></el-icon>
+      <el-tag type="warning">{{ store.selectedRegion?.name }}</el-tag>
+    </div>
+
     <el-card>
       <template #header>
         <div class="card-header">
@@ -52,7 +61,10 @@
     </el-card>
 
     <div class="page-actions">
-      <el-button @click="$router.push('/')">返回首页</el-button>
+      <el-button @click="goBack">
+        <el-icon><ArrowLeft /></el-icon>
+        返回
+      </el-button>
       <el-button
         type="primary"
         :disabled="!store.hasData"
@@ -65,12 +77,30 @@
 </template>
 
 <script setup>
-import { UploadFilled } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { UploadFilled, ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { uploadFile } from '@/api'
 import { useProjectStore } from '@/stores/project'
 
+const router = useRouter()
 const store = useProjectStore()
+
+// 专题名称映射
+const topicNames = {
+  attribute_map: '属性图',
+  type_map: '类型图',
+  suitability: '适宜性评价',
+  grade_eval: '等级评价'
+}
+
+const getTopicName = () => {
+  return topicNames[store.selectedTopic] || store.selectedTopic
+}
+
+const goBack = () => {
+  router.push('/')
+}
 
 const handleFileChange = async (uploadFile) => {
   const file = uploadFile.raw
@@ -91,6 +121,20 @@ const handleFileChange = async (uploadFile) => {
   max-width: 900px;
   margin: 0 auto;
   padding: 20px;
+}
+
+.current-selection {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.current-selection .el-icon {
+  color: #909399;
 }
 
 .card-header {

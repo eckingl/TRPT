@@ -1,0 +1,1065 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import pandas as pd
+import chardet
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from datetime import datetime
+import openpyxl  # 假设你也使用openpyxl来处理Excel文件
+import numpy as np  # 导入numpy,并使用np作为别名
+from pypinyin import lazy_pinyin  # 导入拼音库
+
+
+def get_pinyin_first_letter(text):
+    """获取文本的拼音首字母（用于排序）"""
+    pinyin_list = lazy_pinyin(str(text))
+    return ''.join(pinyin_list).lower()
+
+
+def read_csv_safe(filepath):
+    with open(filepath, 'rb') as f:
+        raw = f.read(10000)
+        enc = chardet.detect(raw)['encoding']
+        if enc is None:
+            enc = 'utf-8'
+        if enc.lower() in ['gb2312', 'gbk', 'cp936']:
+            enc = 'gbk'
+    try:
+        return pd.read_csv(filepath, encoding=enc)
+    except Exception as e:
+        raise ValueError(f"无法读取 {filepath}（编码: {enc}）: {e}")
+
+
+def normalize_dlm_column(df):
+    """将数据框中任意大小写的 'dlm'、'dlmc' 或 '二级地类' 列统一重命名为 'DLMC'"""
+    dlm_col = None
+    for col in df.columns:
+        col_lower = col.strip().lower()
+        if col_lower in ['dlm', 'dlmc'] or col.strip() == '二级地类':
+            dlm_col = col
+            break
+    if dlm_col is None:
+        raise ValueError("未找到名为 'dlm'、'dlmc' 或 '二级地类' 的列（不区分大小写）")
+    df = df.rename(columns={dlm_col: 'DLMC'})
+    return df
+
+
+def find_column_case_insensitive(df, target_col):
+    """在数据框中查找指定列名（不区分大小写）"""
+    for col in df.columns:
+        if col.strip().lower() == target_col.lower():
+            return col
+    raise ValueError(f"未找到名为 '{target_col}' 的列（不区分大小写）")
+
+
+def process_files(sample_path, area_paths, output_path):
+    try:
+        # 读取样点文件（单个）
+        df_sample = read_csv_safe(sample_path)
+
+        # 读取并合并多个制图文件
+        df_area_list = []
+        for path in area_paths:
+            df_temp = read_csv_safe(path)
+            if '面积' not in df_temp.columns:
+                raise ValueError(f"制图文件 {path} 中缺少 '面积' 列")
+            df_area_list.append(df_temp)
+
+        if not df_area_list:
+            raise ValueError("未提供有效的制图统计文件")
+
+        df_area = pd.concat(df_area_list, ignore_index=True)
+
+        # 查找机械组成列（不区分大小写）
+        sand_col = find_column_case_insensitive(df_sample, 'sand')
+        silt_col = find_column_case_insensitive(df_sample, 'silt')
+        clay_col = find_column_case_insensitive(df_sample, 'clay')
+
+        sand_col_area = find_column_case_insensitive(df_area, 'sand')
+        silt_col_area = find_column_case_insensitive(df_area, 'silt')
+        clay_col_area = find_column_case_insensitive(df_area, 'clay')
+
+        # 标准化 DLMC 列（支持 DLMC/二级地类）
+        df_sample = normalize_dlm_column(df_sample)
+        df_area = normalize_dlm_column(df_area)
+
+        # 标准化 YL 和 TS 列（支持 SSub_JZg/YL 和 SGen_JZg/TS）
+        # 样点文件
+        if 'YL' in df_sample.columns:
+            pass
+        elif 'SSub_JZg' in df_sample.columns:
+            df_sample = df_sample.rename(columns={'SSub_JZg': 'YL'})
+        else:
+            raise ValueError("样点文件缺少'YL'或'SSub_JZg'列")
+        
+        if 'TS' in df_sample.columns:
+            pass
+        elif 'SGen_JZg' in df_sample.columns:
+            df_sample = df_sample.rename(columns={'SGen_JZg': 'TS'})
+        else:
+            raise ValueError("样点文件缺少'TS'或'SGen_JZg'列")
+        
+        # 制图文件
+        if 'YL' in df_area.columns:
+            pass
+        elif 'SSub_JZg' in df_area.columns:
+            df_area = df_area.rename(columns={'SSub_JZg': 'YL'})
+        else:
+            raise ValueError("制图文件缺少'YL'或'SSub_JZg'列")
+        
+        if 'TS' in df_area.columns:
+            pass
+        elif 'SGen_JZg' in df_area.columns:
+            df_area = df_area.rename(columns={'SGen_JZg': 'TS'})
+        else:
+            raise ValueError("制图文件缺少'TS'或'SGen_JZg'列")
+
+        # 重命名列以保持一致
+        df_sample.rename(columns={sand_col: 'sand', silt_col: 'silt', clay_col: 'clay'}, inplace=True)
+        df_area.rename(columns={sand_col_area: 'sand', silt_col_area: 'silt', clay_col_area: 'clay'}, inplace=True)
+
+        # 转换数据类型
+        df_sample['sand'] = pd.to_numeric(df_sample['sand'], errors='coerce')
+        df_sample['silt'] = pd.to_numeric(df_sample['silt'], errors='coerce')
+        df_sample['clay'] = pd.to_numeric(df_sample['clay'], errors='coerce')
+        df_area['sand'] = pd.to_numeric(df_area['sand'], errors='coerce')
+        df_area['silt'] = pd.to_numeric(df_area['silt'], errors='coerce')
+        df_area['clay'] = pd.to_numeric(df_area['clay'], errors='coerce')
+        df_area['面积'] = pd.to_numeric(df_area['面积'], errors='coerce')
+
+        # ========== 第一部分：机械组成统计（Sheet1）==========
+        wb = Workbook()
+        ws1 = wb.active
+        ws1.title = "机械组成总体情况"
+
+        # --- 原有汇总表 ---
+        ws1.merge_cells('A1:F1')
+        ws1['A1'] = '土壤机械组成分布统计'
+        ws1['A1'].font = Font(bold=True, size=14)
+        ws1['A1'].alignment = Alignment(horizontal='center')
+
+        ws1.merge_cells('A2:B2')
+        ws1['A2'] = '组成类型'
+        ws1.merge_cells('C2:D2')
+        ws1['C2'] = '样点统计%'
+        ws1.merge_cells('E2:F2')
+        ws1['E2'] = '制图统计%'
+
+        ws1['A3'], ws1['B3'] = '成分', '名称'
+        ws1['C3'], ws1['D3'] = '含量/%', '占比/%'
+        ws1['E3'], ws1['F3'] = '含量/%', '占比/%'
+
+        # 过滤掉值为0的行（样点和制图都过滤）
+        df_sample_filtered = df_sample[(df_sample['sand'] + df_sample['silt'] +df_sample['clay']) > 0]
+        df_area_filtered = df_area[(df_area['sand'] + df_area['silt'] + df_area['clay']) > 0]
+
+        components = ['砂粒', '粉粒', '黏粒']
+        sample_values = [
+            df_sample_filtered['sand'].mean(),
+            df_sample_filtered['silt'].mean(),
+            df_sample_filtered['clay'].mean()
+        ]
+        area_values = [
+            df_area_filtered['sand'].mean(),
+            df_area_filtered['silt'].mean(),
+            df_area_filtered['clay'].mean()
+        ]
+
+        for i, comp in enumerate(components):
+            row = 4 + i
+            ws1.cell(row, 1, comp)
+            ws1.cell(row, 2, f'{comp}%')
+            ws1.cell(row, 3, round(sample_values[i], 3))
+            ws1.cell(row, 4, round(sample_values[i], 3))
+            ws1.cell(row, 5, round(area_values[i], 3))
+            ws1.cell(row, 6, round(area_values[i], 3))
+
+        total_sample = sum(sample_values)
+        total_area = sum(area_values)
+        ws1.merge_cells('A7:B7')
+        ws1['A7'] = '总计'
+        ws1['C7'] = round(total_sample, 3)
+        ws1['D7'] = round(total_sample, 3)
+        ws1['E7'] = round(total_area, 3)
+        ws1['F7'] = round(total_area, 3)
+
+        # 格式化原有表格
+        thin = Side(border_style="thin")
+        border = Border(top=thin, left=thin, right=thin, bottom=thin)
+        for row in ws1.iter_rows(min_row=1, max_row=7, min_col=1, max_col=6):
+            for cell in row:
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+        for col in range(1, 7):
+            ws1.cell(2, col).font = Font(bold=True)
+            ws1.cell(3, col).font = Font(bold=True)
+        for r in range(4, 7):
+            ws1.cell(r, 1).font = Font(bold=True)
+        for col, w in zip(['A', 'B', 'C', 'D', 'E', 'F'], [10, 12, 12, 12, 12, 12]):
+            ws1.column_dimensions[col].width = w
+
+        # ==================== 新增：分级统计表 ====================
+        def classify_grade(value):
+            if pd.isna(value):
+                return None
+            if value > 65 and value <= 100:
+                return "Ⅰ级"
+            elif value > 45:
+                return "Ⅱ级"
+            elif value > 25:
+                return "Ⅲ级"
+            elif value > 15:
+                return "Ⅳ级"
+            else:
+                return "Ⅴ级"
+
+        grade_ranges = {
+            "Ⅰ级": "65~100",
+            "Ⅱ级": "45~65",
+            "Ⅲ级": "25~45",
+            "Ⅳ级": "15~25",
+            "Ⅴ级": "≤15"
+        }
+        grades_order = ["Ⅰ级", "Ⅱ级", "Ⅲ级", "Ⅳ级", "Ⅴ级"]
+
+        # 过滤掉值为0的行（样点和制图都过滤）
+        df_sample_valid = df_sample_filtered[['sand', 'silt', 'clay']].dropna()
+        df_area_valid = df_area_filtered[['sand', 'silt', 'clay', '面积']].dropna(subset=['sand', 'silt', 'clay'])
+
+        # 全局面积总和（用于占比，过滤0值）
+        total_area_sum = df_area_valid['面积'].sum() if '面积' in df_area_valid.columns else 0
+
+        start_row = 9  # 在原表下方空一行开始
+
+        for particle, col_name in [("砂粒", "sand"), ("粉粒", "silt"), ("黏粒", "clay")]:
+            # 添加标题
+            ws1.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=6)
+            ws1.cell(start_row, 1, f"土壤三普分级（{particle}）")
+            ws1.cell(start_row, 1).font = Font(bold=True, size=12)
+            ws1.cell(start_row, 1).alignment = Alignment(horizontal='center')
+            start_row += 1
+
+            # 表头
+            headers = ["分级", "值域/%", "数量/个", "占比/%", "面积/亩", "占比/%"]
+            for j, h in enumerate(headers, 1):
+                ws1.cell(start_row, j, h)
+                ws1.cell(start_row, j).font = Font(bold=True)
+            start_row += 1
+
+            # 样点分级
+            df_sample_valid_particle = df_sample_valid[[col_name]].dropna()
+            df_sample_valid_particle['grade'] = df_sample_valid_particle[col_name].apply(classify_grade)
+
+            # 制图分级（需关联面积）
+            df_area_valid_particle = df_area_valid[[col_name, '面积']].dropna(subset=[col_name])
+            df_area_valid_particle['grade'] = df_area_valid_particle[col_name].apply(classify_grade)
+
+            total_sample_count = len(df_sample_valid_particle)
+
+            for grade in grades_order:
+                # 样点统计
+                count = len(df_sample_valid_particle[df_sample_valid_particle['grade'] == grade])
+                pct_sample = count / total_sample_count * 100 if total_sample_count > 0 else 0
+
+                # 面积统计
+                area_df_grade = df_area_valid_particle[df_area_valid_particle['grade'] == grade]
+                area_sum = area_df_grade['面积'].sum() if not area_df_grade.empty else 0
+                pct_area = area_sum / total_area_sum * 100 if total_area_sum > 0 else 0
+
+                ws1.cell(start_row, 1, grade)
+                ws1.cell(start_row, 2, grade_ranges[grade])
+                ws1.cell(start_row, 3, count)
+                ws1.cell(start_row, 4, round(pct_sample, 3))
+                ws1.cell(start_row, 5, round(area_sum, 3))
+                ws1.cell(start_row, 6, round(pct_area, 3))
+                start_row += 1
+
+            # 全区汇总行
+            ws1.cell(start_row, 1, "全区")
+            ws1.cell(start_row, 2, "")
+            ws1.cell(start_row, 3, total_sample_count)
+            ws1.cell(start_row, 4, 100.0 if total_sample_count > 0 else 0)
+            ws1.cell(start_row, 5, round(total_area_sum, 3))
+            ws1.cell(start_row, 6, 100.0 if total_area_sum > 0 else 0)
+            start_row += 1
+
+            # 全区均值、中位值、范围（样点统计，排除0值）
+            sample_vals = df_sample_valid_particle[col_name].dropna()
+            if len(sample_vals) > 0:
+                mean_val_sample = round(sample_vals.mean(), 3)
+                median_val_sample = round(sample_vals.median(), 3)
+                min_val_sample = round(sample_vals.min(), 3)
+                max_val_sample = round(sample_vals.max(), 3)
+                range_str_sample = f"{min_val_sample}~{max_val_sample}"
+            else:
+                mean_val_sample = median_val_sample = range_str_sample = ""
+
+            # 全区均值、中位值、范围（面积统计，排除0值）
+            area_vals = df_area_valid_particle[col_name].dropna()
+            if len(area_vals) > 0:
+                mean_val_area = round(area_vals.mean(), 3)
+                median_val_area = round(area_vals.median(), 3)
+                min_val_area = round(area_vals.min(), 3)
+                max_val_area = round(area_vals.max(), 3)
+                range_str_area = f"{min_val_area}~{max_val_area}"
+            else:
+                mean_val_area = median_val_area = range_str_area = ""
+
+            # 写入 Excel 表格（每项一行，样点在 C 列，面积在 E 列）
+            ws1.cell(start_row, 1, "全区均值/%")
+            ws1.cell(start_row, 3, mean_val_sample)  # 样点统计
+            ws1.cell(start_row, 5, mean_val_area)  # 面积统计
+            start_row += 1
+
+            ws1.cell(start_row, 1, "全区中位值/%")
+            ws1.cell(start_row, 3, median_val_sample)  # 样点统计
+            ws1.cell(start_row, 5, median_val_area)  # 面积统计
+            start_row += 1
+
+            ws1.cell(start_row, 1, "全区范围/%")
+            ws1.cell(start_row, 3, range_str_sample)  # 样点统计
+            ws1.cell(start_row, 5, range_str_area)  # 面积统计
+            start_row += 2  # 空一行分隔下一个粒级
+        # 最后统一设置边框和列宽（覆盖整个使用区域）
+        max_used_row = start_row - 1
+        for row in ws1.iter_rows(min_row=1, max_row=max_used_row, min_col=1, max_col=6):
+            for cell in row:
+                if cell.value is not None or cell.row <= 7:  # 避免空白单元格无意义加边框
+                    cell.border = border
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        for col in ['A', 'B', 'C', 'D', 'E', 'F']:
+            ws1.column_dimensions[col].width = 14
+
+        # ========== 第二部分：土地利用类型统计（Sheet2）==========
+        def get_land_class(dlmc):
+            if pd.isna(dlmc):
+                return None
+            s = str(dlmc).strip()
+            if s in ["水田", "水浇地", "旱地"]:
+                return ("耕地", s)
+            elif s in ["果园", "茶园"]:
+                return ("园地", s)
+            elif "园地" in s:
+                return ("园地", "其他园地")
+            elif "林地" in s:
+                return ("林地", "林地")
+            elif "草地" in s:
+                return ("草地", "草地")
+            else:
+                return ("其他", "其他")
+
+        df_sample[['一级', '二级']] = df_sample['DLMC'].apply(get_land_class).apply(pd.Series)
+        df_area[['一级', '二级']] = df_area['DLMC'].apply(get_land_class).apply(pd.Series)
+        df_sample = df_sample.dropna(subset=['一级'])
+        df_area = df_area.dropna(subset=['一级'])
+
+        ws2 = wb.create_sheet(title="机械组成不同土地利用类型")
+
+        # ===== 表头设置（10列）=====
+        ws2.merge_cells('A1:J1')
+        ws2['A1'] = '不同土地利用类型机械组成统计'
+        ws2['A1'].font = Font(bold=True, size=14)
+        ws2['A1'].alignment = Alignment(horizontal='center')
+
+        ws2['A2'] = '一级'
+        ws2['B2'] = '二级'
+        ws2['C2'] = '样点数'
+        ws2['D2'] = '面积/亩'
+        ws2.merge_cells('E2:G2')  # 样点统计 跨 E2:G2（3列）
+        ws2['E2'] = '样点统计%'
+        ws2.merge_cells('H2:J2')  # 制图统计 跨 H2:J2（3列）
+        ws2['H2'] = '制图统计%'
+
+        # 新列顺序：样点数、面积/亩 | 砂粒%、粉粒%、黏粒% | 砂粒%、粉粒%、黏粒%
+        ws2['E3'] = '砂粒%'
+        ws2['F3'] = '粉粒%'
+        ws2['G3'] = '黏粒%'
+        ws2['H3'] = '砂粒%'
+        ws2['I3'] = '粉粒%'
+        ws2['J3'] = '黏粒%'
+
+        for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']:
+            ws2[col + '2'].font = Font(bold=True)
+            ws2[col + '3'].font = Font(bold=True)
+
+        current_row = 4
+        land_config = {
+            "耕地": ["水田", "水浇地", "旱地"],
+            "园地": ["果园", "茶园", "其他园地"],
+            "林地": ["林地"],
+            "草地": ["草地"],
+            "其他": ["其他"]
+        }
+
+        # 过滤掉值为0的行（样点和制图都过滤）
+        df_sample_filtered = df_sample[(df_sample['sand'] + df_sample['silt'] +df_sample['clay']) > 0]
+        df_area_filtered = df_area[(df_area['sand'] + df_area['silt'] + df_area['clay']) > 0]
+
+        all_sand_global = df_sample_filtered['sand'].dropna()
+        all_silt_global = df_sample_filtered['silt'].dropna()
+        all_clay_global = df_sample_filtered['clay'].dropna()
+        global_total_count = len(df_sample_filtered)
+        global_total_area = df_area_filtered['面积'].sum()
+
+        start_row_map = {}
+
+        for primary, secondaries in land_config.items():
+            sample_primary = df_sample_filtered[df_sample_filtered['一级'] == primary]
+            area_primary = df_area_filtered[df_area_filtered['一级'] == primary]
+
+            total_count_p = 0
+            total_area_p = 0.0
+            sand_vals_all = []
+            silt_vals_all = []
+            clay_vals_all = []
+
+            start_row_map[primary] = current_row
+
+            for idx, sec in enumerate(secondaries):
+                if primary in ["林地", "草地"]:
+                    sample_sec = sample_primary
+                    area_sec = area_primary
+                else:
+                    sample_sec = sample_primary[sample_primary['二级'] == sec]
+                    area_sec = area_primary[area_primary['二级'] == sec]
+
+                count = len(sample_sec)
+                sand_vals = sample_sec['sand'].dropna() if not sample_sec.empty else pd.Series([], dtype='float64')
+                silt_vals = sample_sec['silt'].dropna() if not sample_sec.empty else pd.Series([], dtype='float64')
+                clay_vals = sample_sec['clay'].dropna() if not sample_sec.empty else pd.Series([], dtype='float64')
+
+                # 样点统计
+                if count > 0 and not sand_vals.empty:
+                    mean_sand_sample = f"{sand_vals.mean():.3f}"
+                    mean_silt_sample = f"{silt_vals.mean():.3f}"
+                    mean_clay_sample = f"{clay_vals.mean():.3f}"
+                else:
+                    mean_sand_sample = ""
+                    mean_silt_sample = ""
+                    mean_clay_sample = ""
+
+                # 制图统计（不加权）
+                if not area_sec.empty and '面积' in area_sec.columns:
+                    area_val = area_sec['面积'].sum()
+                    sand_area_vals = area_sec['sand'].dropna()
+                    silt_area_vals = area_sec['silt'].dropna()
+                    clay_area_vals = area_sec['clay'].dropna()
+
+                    if not sand_area_vals.empty:
+                        # 不加权平均
+                        mean_sand_area = f"{sand_area_vals.mean():.3f}"
+                        mean_silt_area = f"{silt_area_vals.mean():.3f}"
+                        mean_clay_area = f"{clay_area_vals.mean():.3f}"
+                    else:
+                        mean_sand_area = ""
+                        mean_silt_area = ""
+                        mean_clay_area = ""
+
+                else:
+                    area_val = 0.0
+                    mean_sand_area = ""
+                    mean_silt_area = ""
+                    mean_clay_area = ""
+
+                # 写入单元格（新列顺序）
+                if idx == 0:
+                    ws2.cell(row=current_row, column=1, value=primary)
+                else:
+                    ws2.cell(row=current_row, column=1, value="")
+
+                ws2.cell(row=current_row, column=2, value=sec)
+                ws2.cell(row=current_row, column=3, value=count)  # 样点数
+                ws2.cell(row=current_row, column=4, value=round(area_val, 3))  # 面积
+                ws2.cell(row=current_row, column=5, value=mean_sand_sample)  # 样点统计
+                ws2.cell(row=current_row, column=6, value=mean_silt_sample)
+                ws2.cell(row=current_row, column=7, value=mean_clay_sample)
+                ws2.cell(row=current_row, column=8, value=mean_sand_area)  # 制图统计
+                ws2.cell(row=current_row, column=9, value=mean_silt_area)
+                ws2.cell(row=current_row, column=10, value=mean_clay_area)
+
+                total_count_p += count
+                total_area_p += area_val
+                sand_vals_all.extend(sand_vals.tolist())
+                silt_vals_all.extend(silt_vals.tolist())
+                clay_vals_all.extend(clay_vals.tolist())
+                current_row += 1
+
+            # 合计行（仅耕地、园地）
+            if primary in ["耕地", "园地"]:
+                sand_series = pd.Series(sand_vals_all)
+                silt_series = pd.Series(silt_vals_all)
+                clay_series = pd.Series(clay_vals_all)
+
+                if len(sand_series) > 0:
+                    mean_sand_all = f"{sand_series.mean():.3f}"
+                    mean_silt_all = f"{silt_series.mean():.3f}"
+                    mean_clay_all = f"{clay_series.mean():.3f}"
+                else:
+                    mean_sand_all = mean_silt_all = mean_clay_all = ""
+
+                # 不加权平均
+                area_primary_filtered = area_primary.dropna(subset=['sand', 'silt', 'clay'])
+                if not area_primary_filtered.empty:
+                    mean_sand_area_all = f"{area_primary_filtered['sand'].mean():.3f}"
+                    mean_silt_area_all = f"{area_primary_filtered['silt'].mean():.3f}"
+                    mean_clay_area_all = f"{area_primary_filtered['clay'].mean():.3f}"
+                else:
+                    mean_sand_area_all = mean_silt_area_all = mean_clay_area_all = ""
+
+                ws2.cell(row=current_row, column=1, value="")
+                ws2.cell(row=current_row, column=2, value="合计")
+                ws2.cell(row=current_row, column=3, value=total_count_p)  # 样点数
+                ws2.cell(row=current_row, column=4, value=round(total_area_p, 3))  # 面积
+                ws2.cell(row=current_row, column=5, value=mean_sand_all)  # 样点统计
+                ws2.cell(row=current_row, column=6, value=mean_silt_all)
+                ws2.cell(row=current_row, column=7, value=mean_clay_all)
+                ws2.cell(row=current_row, column=8, value=mean_sand_area_all)  # 制图统计
+                ws2.cell(row=current_row, column=9, value=mean_silt_area_all)
+                ws2.cell(row=current_row, column=10, value=mean_clay_area_all)
+                current_row += 1
+
+                # 合并一级类
+                end_row = current_row - 1
+                ws2.merge_cells(f'A{start_row_map[primary]}:A{end_row}')
+                ws2.cell(row=start_row_map[primary], column=1).alignment = Alignment(horizontal='center', vertical='center')
+
+        # 全市总计
+        if len(all_sand_global) > 0:
+            global_mean_sand = f"{all_sand_global.mean():.3f}"
+            global_mean_silt = f"{all_silt_global.mean():.3f}"
+            global_mean_clay = f"{all_clay_global.mean():.3f}"
+        else:
+            global_mean_sand = global_mean_silt = global_mean_clay = ""
+
+        # 全市不加权平均
+        area_all_filtered = df_area_filtered.dropna(subset=['sand', 'silt', 'clay'])
+        if not area_all_filtered.empty:
+            global_mean_sand_area = f"{area_all_filtered['sand'].mean():.3f}"
+            global_mean_silt_area = f"{area_all_filtered['silt'].mean():.3f}"
+            global_mean_clay_area = f"{area_all_filtered['clay'].mean():.3f}"
+        else:
+            global_mean_sand_area = global_mean_silt_area = global_mean_clay_area = ""
+
+        ws2.cell(row=current_row, column=1, value="全市")
+        ws2.cell(row=current_row, column=2, value="")
+        ws2.cell(row=current_row, column=3, value=global_total_count)  # 样点数
+        ws2.cell(row=current_row, column=4, value=round(global_total_area, 3))  # 面积
+        ws2.cell(row=current_row, column=5, value=global_mean_sand)  # 样点统计
+        ws2.cell(row=current_row, column=6, value=global_mean_silt)
+        ws2.cell(row=current_row, column=7, value=global_mean_clay)
+        ws2.cell(row=current_row, column=8, value=global_mean_sand_area)  # 制图统计
+        ws2.cell(row=current_row, column=9, value=global_mean_silt_area)
+        ws2.cell(row=current_row, column=10, value=global_mean_clay_area)
+        # 合并“全市”总合计行的A、B两列
+        ws2.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=2)
+        ws2.cell(row=current_row, column=1).alignment = Alignment(horizontal='center', vertical='center')
+
+        # 格式化
+        thin = Side(border_style="thin")
+        border = Border(top=thin, left=thin, right=thin, bottom=thin)
+        for row in ws2.iter_rows(min_row=1, max_row=current_row, min_col=1, max_col=10):
+            for cell in row:
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']:
+            ws2.column_dimensions[col].width = 12
+
+    except Exception as e:
+        return False, str(e)
+
+    # ========== 第三部分：乡镇级统计（Sheet3）==========
+    ws3 = wb.create_sheet(title="机械组成分乡镇统计")
+
+    # 表头（8列）
+    ws3.merge_cells('A1:A2')
+    ws3['A1'] = '区县'
+    ws3['A1'].font = Font(bold=True, size=12)
+    ws3['A1'].alignment = Alignment(horizontal='center')
+
+    ws3['B2'] = '样点数'
+    ws3['C2'] = '面积/亩'
+    
+    ws3.merge_cells('D1:F1')
+    ws3['D1'] = '样点统计%'
+    ws3.merge_cells('G1:I1')
+    ws3['G1'] = '制图统计%'
+
+    ws3['D2'], ws3['E2'], ws3['F2'], ws3['G2'], ws3['H2'], ws3['I2'] = \
+        '砂粒%', '粉粒%', '黏粒%', '砂粒%', '粉粒%', '黏粒%'
+
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']:
+        ws3[col + '1'].font = Font(bold=True)
+        ws3[col + '2'].font = Font(bold=True)
+
+    # 过滤掉值为0的行（样点和制图都过滤）
+    df_sample_filtered = df_sample[(df_sample['sand'] + df_sample['silt'] + df_sample['clay'] )> 0]
+    df_area_filtered = df_area[(df_area['sand'] + df_area['silt'] + df_area['clay']) > 0]
+
+    # 获取所有乡镇名称（去重）并按拼音排序
+    towns_sample = df_sample_filtered['行政区名称'].dropna().astype(str).unique()
+    towns_area = df_area_filtered['行政区名称'].dropna().astype(str).unique()
+    all_towns = np.union1d(towns_sample, towns_area)  # 合并两个数组的唯一值
+    all_towns = sorted(all_towns, key=get_pinyin_first_letter)  # 拼音排序
+
+    current_row = 3
+
+    # === 1. 遍历所有乡镇，写入各行 ===
+    for town in all_towns:
+        # 样点统计
+        sample_town = df_sample_filtered[df_sample_filtered['行政区名称'] == town]
+        count = len(sample_town)
+        mean_sand_sample = sample_town['sand'].mean() if count > 0 else 0
+        mean_silt_sample = sample_town['silt'].mean() if count > 0 else 0
+        mean_clay_sample = sample_town['clay'].mean() if count > 0 else 0
+
+        # 制图统计（不加权）
+        area_town = df_area_filtered[df_area_filtered['行政区名称'] == town]
+        area_sum = area_town['面积'].sum() if '面积' in area_town.columns and not area_town.empty else 0
+
+        if not area_town.empty:
+            mean_sand_area = area_town['sand'].mean()
+            mean_silt_area = area_town['silt'].mean()
+            mean_clay_area = area_town['clay'].mean()
+        else:
+            mean_sand_area = mean_silt_area = mean_clay_area = 0
+
+        # 写入行（新列顺序）
+        ws3.cell(row=current_row, column=1, value=town)
+        ws3.cell(row=current_row, column=2, value=count)  # 样点数
+        ws3.cell(row=current_row, column=3, value=round(area_sum, 3))  # 面积
+        ws3.cell(row=current_row, column=4, value=round(mean_sand_sample, 3))  # 样点统计
+        ws3.cell(row=current_row, column=5, value=round(mean_silt_sample, 3))
+        ws3.cell(row=current_row, column=6, value=round(mean_clay_sample, 3))
+        ws3.cell(row=current_row, column=7, value=round(mean_sand_area, 3))  # 制图统计
+        ws3.cell(row=current_row, column=8, value=round(mean_silt_area, 3))
+        ws3.cell(row=current_row, column=9, value=round(mean_clay_area, 3))
+        current_row += 1
+
+    # === 2. 全市汇总（仅一次，放在循环外）===
+    count_all = len(df_sample_filtered)
+    mean_sand_sample_all = df_sample_filtered['sand'].mean() if count_all > 0 else 0
+    mean_silt_sample_all = df_sample_filtered['silt'].mean() if count_all > 0 else 0
+    mean_clay_sample_all = df_sample_filtered['clay'].mean() if count_all > 0 else 0
+
+    area_sum_all = df_area_filtered['面积'].sum() if '面积' in df_area_filtered.columns else 0
+    if not df_area_filtered.empty:
+        mean_sand_area_all = df_area_filtered['sand'].mean()
+        mean_silt_area_all = df_area_filtered['silt'].mean()
+        mean_clay_area_all = df_area_filtered['clay'].mean()
+    else:
+        mean_sand_area_all = mean_silt_area_all = mean_clay_area_all = 0
+
+    # 写入"全市"行（新列顺序）
+    ws3.cell(row=current_row, column=1, value="全市")
+    ws3.cell(row=current_row, column=2, value=count_all)  # 样点数
+    ws3.cell(row=current_row, column=3, value=round(area_sum_all, 3))  # 面积
+    ws3.cell(row=current_row, column=4, value=round(mean_sand_sample_all, 3))  # 样点统计
+    ws3.cell(row=current_row, column=5, value=round(mean_silt_sample_all, 3))
+    ws3.cell(row=current_row, column=6, value=round(mean_clay_sample_all, 3))
+    ws3.cell(row=current_row, column=7, value=round(mean_sand_area_all, 3))  # 制图统计
+    ws3.cell(row=current_row, column=8, value=round(mean_silt_area_all, 3))
+    ws3.cell(row=current_row, column=9, value=round(mean_clay_area_all, 3))
+    current_row += 1
+
+    # 格式化边框和列宽
+    thin = Side(border_style="thin")
+    border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    for row in ws3.iter_rows(min_row=1, max_row=current_row - 1, min_col=1, max_col=9):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']:
+        ws3.column_dimensions[col].width = 12
+
+    # ========== 第四部分：土壤类型统计（Sheet4）==========
+    ws4 = wb.create_sheet(title="机械组成分土壤类型")
+
+    # 表头（10列）
+    ws4.merge_cells('A3:B3')
+    ws4['A3'] = '土壤类型'
+    ws4['A3'].font = Font(bold=True, size=12)
+    ws4['A3'].alignment = Alignment(horizontal='center')
+
+    ws4.merge_cells('C3:D3')
+    ws4['C3'] = '其他'
+    ws4.merge_cells('E3:G3')
+    ws4['E3'] = '样点统计%'
+    ws4.merge_cells('H3:J3')
+    ws4['H3'] = '制图统计%'
+
+    headers = ['亚类', '土属', '样点数', '面积/亩', '砂粒%', '粉粒%', '黏粒%', '砂粒%', '粉粒%', '黏粒%']
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws4.cell(row=4, column=col_idx, value=header)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+
+    # === 数据清洗 ===
+    # 过滤掉值为0的行（样点和制图都过滤）
+    df_sample_clean = df_sample_filtered.dropna(subset=['YL', 'TS']).copy()
+    df_area_clean = df_area_filtered.dropna(subset=['YL', 'TS']).copy()
+
+    for df in [df_sample_clean, df_area_clean]:
+        df['YL'] = df['YL'].astype(str).str.strip()
+        df['TS'] = df['TS'].astype(str).str.strip()
+
+    df_sample_clean['sand'] = pd.to_numeric(df_sample_clean['sand'], errors='coerce')
+    df_sample_clean['silt'] = pd.to_numeric(df_sample_clean['silt'], errors='coerce')
+    df_sample_clean['clay'] = pd.to_numeric(df_sample_clean['clay'], errors='coerce')
+
+    if 'sand' in df_area_clean.columns:
+        df_area_clean['sand'] = pd.to_numeric(df_area_clean['sand'], errors='coerce')
+    if 'silt' in df_area_clean.columns:
+        df_area_clean['silt'] = pd.to_numeric(df_area_clean['silt'], errors='coerce')
+    if 'clay' in df_area_clean.columns:
+        df_area_clean['clay'] = pd.to_numeric(df_area_clean['clay'], errors='coerce')
+    if '面积' in df_area_clean.columns:
+        df_area_clean['面积'] = pd.to_numeric(df_area_clean['面积'], errors='coerce')
+
+    # 获取所有 (亚类, 土属) 组合
+    all_pairs = pd.concat([
+        df_sample_clean[['YL', 'TS']],
+        df_area_clean[['YL', 'TS']]
+    ]).drop_duplicates().reset_index(drop=True)
+
+    sub_to_gens = {}
+    for _, row in all_pairs.iterrows():
+        sub, gen = row['YL'], row['TS']
+        if sub not in sub_to_gens:
+            sub_to_gens[sub] = set()
+        sub_to_gens[sub].add(gen)
+
+    # 土壤类型排序映射表（39种亚类 + 200+种土属）
+    soil_type_order_map = {
+            '棕红壤': ['红泥质棕红壤'],
+            '红壤性土': ['砂泥质红壤性土', '麻砂质红壤性土'],
+            '典型黄棕壤': ['暗泥质黄棕壤', '麻砂质黄棕壤', '红砂质黄棕壤', '黄土质黄棕壤', '砂泥质黄棕壤'],
+            '黄棕壤性土': ['砂泥质黄棕壤性土'],
+            '典型棕壤': ['麻砂质典型棕壤'],
+            '白浆化棕壤': ['麻砂质白浆化棕壤', '泥砂质白浆化棕壤'],
+            '潮棕壤': ['泥砂质潮棕壤'],
+            '淋溶褐土': ['黄土质淋溶褐土', '灰泥质淋溶褐土', '暗泥质淋溶褐土'],
+            '潮褐土': ['泥砂质潮褐土'],
+            '红黏土': ['红黏土'],
+            '黑色石灰土': ['黑色石灰土'],
+            '棕色石灰土': ['棕色石灰土'],
+            '暗火山灰土': ['暗火山灰土'],
+            '酸性紫色土': ['壤质酸性紫色土', '黏质酸性紫色土'],
+            '中性紫色土': ['砂质中性紫色土', '壤质中性紫色土', '黏质中性紫色土'],
+            '石灰性紫色土': ['壤质石灰性紫色土'],
+            '酸性粗骨土': ['麻砂质酸性粗骨土', '硅质酸性粗骨土'],
+            '中性粗骨土': ['麻砂质中性粗骨土'],
+            '钙质粗骨土': ['灰泥质钙质粗骨土'],
+            '典型潮土': ['砂质潮土', '壤质潮土', '黏质潮土'],
+            '灰潮土': ['灰潮土', '石灰性灰潮土'],
+            '盐化潮土（含碱化潮土）': ['氯化物盐化潮土', '硫酸盐盐化潮土', '苏打盐化潮土'],
+            '典型砂姜黑土': ['黑腐砂姜黑土（黑姜土）', '覆泥砂姜黑土（覆泥黑姜土）'],
+            '盐化砂姜黑土': ['氯化物盐化砂姜黑土'],
+            '腐泥沼泽土': ['腐泥沼泽土'],
+            '草甸沼泽土': ['草甸沼泽土', '石灰性草甸沼泽土'],
+            '典型滨海盐土': ['氯化物滨海盐土'],
+            '滨海沼泽盐土': ['氯化物沼泽滨海盐土'],
+            '滨海潮滩盐土': ['氯化物潮滩滨海盐土'],
+            '淹育水稻土': ['浅马肝泥田'],
+            '渗育水稻土': ['渗灰泥田', '渗潮泥砂田', '渗潮泥田', '渗湖泥田', '渗涂泥田', '渗淡涂泥田', '渗麻砂泥田', '渗潮白土田', '渗马肝泥田'],
+            '潴育水稻土': ['潮泥田', '湖泥田', '马肝泥田'],
+            '潜育水稻土': ['青湖泥田', '青马肝泥田'],
+            '脱潜水稻土': ['黄斑黏田', '黄斑泥田'],
+            '漂洗水稻土': ['漂潮白土田', '漂马肝泥田'],
+            '盐渍水稻土': ['氯化物潮泥田', '氯化物涂泥田', '氯化物湖泥田', '硫酸盐潮泥田', '硫酸盐涂泥田', '苏打潮泥田', '苏打涂泥田', '苏打湖泥田'],
+            '填充土': ['工矿填充土', '城镇填充土'],
+            '扰动土': ['运移扰动土']
+    }
+    
+    # 生成亚类排序列表（按映射表顺序）
+    sub_order = list(soil_type_order_map.keys())
+    
+    def get_soil_order(soil_name):
+        """获取土壤类型的排序索引"""
+        try:
+            return sub_order.index(soil_name)
+        except ValueError:
+            return len(sub_order)  # 未在列表中的排到最后
+    
+    # 按土壤类型排序亚类
+    sorted_subs = sorted(sub_to_gens.keys(), key=get_soil_order)
+    
+    # 对每个亚类下的土属按预定义顺序排序
+    for sub in sorted_subs:
+        gen_list = list(sub_to_gens[sub])
+        if sub in soil_type_order_map:
+            # 使用预定义顺序排序
+            predefined_order = soil_type_order_map[sub]
+            def get_gen_order(gen_name):
+                try:
+                    return predefined_order.index(gen_name)
+                except ValueError:
+                    return len(predefined_order)  # 未在列表中的排到最后
+            sub_to_gens[sub] = sorted(gen_list, key=get_gen_order)
+        else:
+            # 没有预定义顺序的，按字符串排序
+            sub_to_gens[sub] = sorted(gen_list)
+
+    current_row = 5
+    a_col_values = []
+
+    for sub in sorted_subs:
+        gens = sub_to_gens[sub]
+        is_multi = len(gens) > 1
+
+        all_sand_sample = pd.Series([], dtype='float64')
+        all_silt_sample = pd.Series([], dtype='float64')
+        all_clay_sample = pd.Series([], dtype='float64')
+        all_sand_area = pd.Series([], dtype='float64')
+        all_silt_area = pd.Series([], dtype='float64')
+        all_clay_area = pd.Series([], dtype='float64')
+        all_areas = pd.Series([], dtype='float64')
+
+        for gen in gens:
+            # --- 样点统计 ---
+            mask_s = (df_sample_clean['YL'] == sub) & (df_sample_clean['TS'] == gen)
+            sand_vals = df_sample_clean.loc[mask_s, 'sand'].dropna()
+            silt_vals = df_sample_clean.loc[mask_s, 'silt'].dropna()
+            clay_vals = df_sample_clean.loc[mask_s, 'clay'].dropna()
+            count = len(sand_vals)
+
+            mean_sand_s = f"{sand_vals.mean():.3f}" if count > 0 else ""
+            mean_silt_s = f"{silt_vals.mean():.3f}" if count > 0 else ""
+            mean_clay_s = f"{clay_vals.mean():.3f}" if count > 0 else ""
+
+            if count > 0:
+                all_sand_sample = pd.concat([all_sand_sample, sand_vals.astype('float64')], ignore_index=True)
+                all_silt_sample = pd.concat([all_silt_sample, silt_vals.astype('float64')], ignore_index=True)
+                all_clay_sample = pd.concat([all_clay_sample, clay_vals.astype('float64')], ignore_index=True)
+
+            # --- 制图统计 ---
+            mask_a = (df_area_clean['YL'] == sub) & (df_area_clean['TS'] == gen)
+            area_df = df_area_clean[mask_a]
+
+            area_sum = 0.0
+            mean_sand_a = ""
+            mean_silt_a = ""
+            mean_clay_a = ""
+            area_pct = ""
+
+            if not area_df.empty and '面积' in area_df.columns and 'sand' in area_df.columns:
+                area_col = area_df['面积']
+                sand_col = area_df['sand']
+                silt_col = area_df['silt']
+                clay_col = area_df['clay']
+
+                valid_mask = sand_col.notna() & silt_col.notna() & clay_col.notna()
+                sand_valid = sand_col[valid_mask]
+                silt_valid = silt_col[valid_mask]
+                clay_valid = clay_col[valid_mask]
+
+                if len(sand_valid) > 0:
+                    area_sum = area_col.sum()
+                    # 不加权平均
+                    mean_sand_a = f"{sand_valid.mean():.3f}"
+                    mean_silt_a = f"{silt_valid.mean():.3f}"
+                    mean_clay_a = f"{clay_valid.mean():.3f}"
+
+                    all_sand_area = pd.concat([all_sand_area, sand_valid.astype('float64')], ignore_index=True)
+                    all_silt_area = pd.concat([all_silt_area, silt_valid.astype('float64')], ignore_index=True)
+                    all_clay_area = pd.concat([all_clay_area, clay_valid.astype('float64')], ignore_index=True)
+                    all_areas = pd.concat([all_areas, area_col.astype('float64')], ignore_index=True)
+
+            # 写入10列（新列顺序）
+            ws4.cell(row=current_row, column=1, value=sub)
+            ws4.cell(row=current_row, column=2, value=gen)
+            ws4.cell(row=current_row, column=3, value=count)  # 样点数
+            ws4.cell(row=current_row, column=4, value=round(area_sum, 3))  # 面积
+            ws4.cell(row=current_row, column=5, value=mean_sand_s)  # 样点统计
+            ws4.cell(row=current_row, column=6, value=mean_silt_s)
+            ws4.cell(row=current_row, column=7, value=mean_clay_s)
+            ws4.cell(row=current_row, column=8, value=mean_sand_a)  # 制图统计
+            ws4.cell(row=current_row, column=9, value=mean_silt_a)
+            ws4.cell(row=current_row, column=10, value=mean_clay_a)
+
+            a_col_values.append(sub)
+            current_row += 1
+
+        # 亚类合计行（多土属时）
+        if is_multi:
+            count_all = len(all_sand_sample)
+            mean_sand_s_all = f"{all_sand_sample.mean():.3f}" if count_all > 0 else ""
+            mean_silt_s_all = f"{all_silt_sample.mean():.3f}" if count_all > 0 else ""
+            mean_clay_s_all = f"{all_clay_sample.mean():.3f}" if count_all > 0 else ""
+
+            total_area_all = all_areas.sum()
+            mean_sand_a_all = ""
+            mean_silt_a_all = ""
+            mean_clay_a_all = ""
+
+            if len(all_sand_area) > 0:
+                # 不加权平均
+                mean_sand_a_all = f"{all_sand_area.mean():.3f}"
+                mean_silt_a_all = f"{all_silt_area.mean():.3f}"
+                mean_clay_a_all = f"{all_clay_area.mean():.3f}"
+
+            ws4.cell(row=current_row, column=1, value="")
+            ws4.cell(row=current_row, column=2, value="合计")
+            ws4.cell(row=current_row, column=3, value=count_all)  # 样点数
+            ws4.cell(row=current_row, column=4, value=round(total_area_all, 3))  # 面积
+            ws4.cell(row=current_row, column=5, value=mean_sand_s_all)  # 样点统计
+            ws4.cell(row=current_row, column=6, value=mean_silt_s_all)
+            ws4.cell(row=current_row, column=7, value=mean_clay_s_all)
+            ws4.cell(row=current_row, column=8, value=mean_sand_a_all)  # 制图统计
+            ws4.cell(row=current_row, column=9, value=mean_silt_a_all)
+            ws4.cell(row=current_row, column=10, value=mean_clay_a_all)
+
+            a_col_values.append("")
+            current_row += 1
+
+    # ========== 全市合计 ==========
+    count_global = len(df_sample_clean)
+    mean_sand_sample_global = f"{df_sample_clean['sand'].mean():.3f}" if count_global > 0 else ""
+    mean_silt_sample_global = f"{df_sample_clean['silt'].mean():.3f}" if count_global > 0 else ""
+    mean_clay_sample_global = f"{df_sample_clean['clay'].mean():.3f}" if count_global > 0 else ""
+
+    # 制图全局
+    global_sand_for_area = df_area_clean['sand'].dropna()
+    global_silt_for_area = df_area_clean['silt'].dropna()
+    global_clay_for_area = df_area_clean['clay'].dropna()
+
+    total_area_global = df_area_clean['面积'].sum()
+    mean_sand_area_global = ""
+    mean_silt_area_global = ""
+    mean_clay_area_global = ""
+
+    if len(global_sand_for_area) > 0:
+        # 不加权平均
+        mean_sand_area_global = f"{global_sand_for_area.mean():.3f}"
+        mean_silt_area_global = f"{global_silt_for_area.mean():.3f}"
+        mean_clay_area_global = f"{global_clay_for_area.mean():.3f}"
+
+    ws4.cell(row=current_row, column=1, value="合计")
+    ws4.cell(row=current_row, column=2, value="")
+    ws4.cell(row=current_row, column=3, value=count_global)  # 样点数
+    ws4.cell(row=current_row, column=4, value=round(total_area_global, 3))  # 面积
+    ws4.cell(row=current_row, column=5, value=mean_sand_sample_global)  # 样点统计
+    ws4.cell(row=current_row, column=6, value=mean_silt_sample_global)
+    ws4.cell(row=current_row, column=7, value=mean_clay_sample_global)
+    ws4.cell(row=current_row, column=8, value=mean_sand_area_global)  # 制图统计
+    ws4.cell(row=current_row, column=9, value=mean_silt_area_global)
+    ws4.cell(row=current_row, column=10, value=mean_clay_area_global)
+    a_col_values.append("合计")
+    # 合并最后总合计的A、B两个单元格（仅最后一行）
+    final_total_row = current_row
+    ws4.merge_cells(start_row=final_total_row, start_column=1, end_row=final_total_row, end_column=2)
+    ws4.cell(row=final_total_row, column=1).alignment = Alignment(horizontal='center', vertical='center')
+    current_row += 1
+
+    # 合并 A 列（包含每个亚类的合计行，但不包含最后的全市总合计）
+    start_idx = 0
+    n = len(a_col_values)
+    for i in range(1, n):
+        # 检测到新的亚类名称或空值后遇到新亚类（说明前一个亚类结束）
+        if a_col_values[i] != "" and a_col_values[i] != "合计" and a_col_values[i] != a_col_values[start_idx]:
+            # 如果当前亚类有多行（包括该亚类的合计行），则合并
+            if i - start_idx > 1 and a_col_values[start_idx] not in ["", "合计"]:
+                ws4.merge_cells(
+                    start_row=5 + start_idx,
+                    start_column=1,
+                    end_row=5 + i - 1,
+                    end_column=1
+                )
+                ws4.cell(row=5 + start_idx, column=1).alignment = Alignment(horizontal='center', vertical='center')
+            start_idx = i
+    
+    # 处理最后一个亚类（但不包括全市总合计行）
+    # 找到最后一个"合计"的位置（全市总合计）
+    last_total_idx = n - 1
+    if a_col_values[last_total_idx] == "合计":
+        # 如果最后一个亚类有多行（包括该亚类的合计行），则合并
+        if last_total_idx - start_idx > 1 and a_col_values[start_idx] not in ["", "合计"]:
+            ws4.merge_cells(
+                start_row=5 + start_idx,
+                start_column=1,
+                end_row=5 + last_total_idx - 1,
+                end_column=1
+            )
+            ws4.cell(row=5 + start_idx, column=1).alignment = Alignment(horizontal='center', vertical='center')
+
+    # 格式化
+    thin = Side(border_style="thin")
+    border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    for row in ws4.iter_rows(min_row=4, max_row=current_row - 1, min_col=1, max_col=10):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    for col_letter in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']:
+        ws4.column_dimensions[col_letter].width = 12
+
+    wb.save(output_path)
+    return True, "处理成功"
+
+
+# =============== GUI 界面 ===============
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("土壤机械组成统计分析")
+        self.root.geometry("580x320")
+        self.sample_file = None
+        self.area_files = None  # 改为列表
+
+        tk.Label(root, text="土壤机械组成分布统计", font=("Arial", 12, "bold")).pack(pady=8)
+        tk.Label(root, text="• 样点文件：1个\n• 制图文件：可多选（按住 Ctrl 或 Shift）", fg="gray").pack()
+
+        tk.Button(root, text="📁 选择【样点统计.csv】", command=self.select_sample).pack(pady=6)
+        self.label_sample = tk.Label(root, text="未选择", fg="gray")
+        self.label_sample.pack()
+
+        tk.Button(root, text="📁 选择【制图统计.csv】（可多选）", command=self.select_area).pack(pady=6)
+        self.label_area = tk.Label(root, text="未选择", fg="gray")
+        self.label_area.pack()
+
+        tk.Button(root, text="✅ 生成统计表", command=self.run_process, bg="#4CAF50", fg="white",
+                  font=("Arial", 12)).pack(pady=15)
+
+    def select_sample(self):
+        f = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if f:
+            self.sample_file = f
+            self.label_sample.config(text=f.split("/")[-1], fg="black")
+
+    def select_area(self):
+        files = filedialog.askopenfilenames(filetypes=[("CSV files", "*.csv")])
+        if files:
+            self.area_files = list(files)
+            count = len(files)
+            if count == 1:
+                self.label_area.config(text=files[0].split("/")[-1], fg="black")
+            else:
+                self.label_area.config(text=f"已选择 {count} 个制图文件", fg="black")
+        else:
+            self.area_files = None
+            self.label_area.config(text="未选择", fg="gray")
+
+    def run_process(self):
+        if not self.sample_file or not self.area_files:
+            messagebox.showwarning("⚠️ 提示", "请先选择样点文件和至少一个制图文件！")
+            return
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output = f"土壤机械组成分布统计_{timestamp}.xlsx"
+
+        success, msg = process_files(self.sample_file, self.area_files, output)
+        if success:
+            messagebox.showinfo("🎉 成功", f"文件已生成：\n{output}")
+        else:
+            messagebox.showerror("❌ 错误", f"处理失败：\n{msg}")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()
+
+
+

@@ -139,10 +139,39 @@
     </div>
 
     <!-- 新建地区对话框 -->
-    <el-dialog v-model="showCreateDialog" title="新建地区" width="400px">
+    <el-dialog v-model="showCreateDialog" title="新建地区" width="500px">
       <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="80px">
-        <el-form-item label="地区名称" prop="name">
-          <el-input v-model="createForm.name" placeholder="请输入地区名称，如：XX县" />
+        <el-form-item label="省份" prop="province">
+          <el-select v-model="createForm.province" placeholder="请选择省份" @change="onProvinceChange">
+            <el-option
+              v-for="province in provinces"
+              :key="province.code"
+              :label="province.name"
+              :value="province.code"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="市" prop="city">
+          <el-select
+            v-model="createForm.city"
+            placeholder="请选择市"
+            :disabled="!createForm.province"
+            @change="onCityChange"
+          >
+            <el-option
+              v-for="city in currentCities"
+              :key="city.code"
+              :label="city.name"
+              :value="city.code"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="县/区" prop="county">
+          <el-input
+            v-model="createForm.county"
+            placeholder="请输入县/区名称"
+            :disabled="!createForm.city"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -182,9 +211,20 @@ const store = useProjectStore()
 const healthStatus = ref('checking')
 const version = ref('-')
 
-const selectedCategory = ref(null)
-const selectedTopic = ref(null)
-const selectedRegion = ref(null)
+// 使用 store 的选择状态（跨页面保持）
+const selectedCategory = computed({
+  get: () => store.selectedCategory,
+  set: (val) => { store.selectedCategory = val }
+})
+const selectedTopic = computed({
+  get: () => store.selectedTopic,
+  set: (val) => { store.selectedTopic = val }
+})
+const selectedRegion = computed({
+  get: () => store.selectedRegion,
+  set: (val) => { store.selectedRegion = val }
+})
+
 const regions = ref([])
 const loadingRegions = ref(false)
 
@@ -192,9 +232,98 @@ const loadingRegions = ref(false)
 const showCreateDialog = ref(false)
 const creating = ref(false)
 const createFormRef = ref()
-const createForm = ref({ name: '' })
+const createForm = ref({
+  province: '',
+  city: '',
+  county: ''
+})
 const createRules = {
-  name: [{ required: true, message: '请输入地区名称', trigger: 'blur' }]
+  province: [{ required: true, message: '请选择省份', trigger: 'change' }],
+  city: [{ required: true, message: '请选择市', trigger: 'change' }],
+  county: [{ required: true, message: '请输入县/区名称', trigger: 'blur' }]
+}
+
+// 省市数据
+const provinces = [
+  { code: 'henan', name: '河南省' },
+  { code: 'anhui', name: '安徽省' },
+  { code: 'jiangsu', name: '江苏省' },
+  { code: 'zhejiang', name: '浙江省' }
+]
+
+const citiesData = {
+  henan: [
+    { code: 'zhengzhou', name: '郑州市' },
+    { code: 'luoyang', name: '洛阳市' },
+    { code: 'kaifeng', name: '开封市' },
+    { code: 'nanyang', name: '南阳市' },
+    { code: 'xinxiang', name: '新乡市' },
+    { code: 'anyang', name: '安阳市' },
+    { code: 'xuchang', name: '许昌市' },
+    { code: 'pingdingshan', name: '平顶山市' },
+    { code: 'xinyang', name: '信阳市' },
+    { code: 'zhoukou', name: '周口市' },
+    { code: 'shangqiu', name: '商丘市' },
+    { code: 'zhumadian', name: '驻马店市' }
+  ],
+  anhui: [
+    { code: 'hefei', name: '合肥市' },
+    { code: 'wuhu', name: '芜湖市' },
+    { code: 'bengbu', name: '蚌埠市' },
+    { code: 'huainan', name: '淮南市' },
+    { code: 'maanshan', name: '马鞍山市' },
+    { code: 'huaibei', name: '淮北市' },
+    { code: 'anqing', name: '安庆市' },
+    { code: 'huangshan', name: '黄山市' },
+    { code: 'chuzhou', name: '滁州市' },
+    { code: 'fuyang', name: '阜阳市' },
+    { code: 'suzhou', name: '宿州市' },
+    { code: 'luan', name: '六安市' }
+  ],
+  jiangsu: [
+    { code: 'nanjing', name: '南京市' },
+    { code: 'suzhou_js', name: '苏州市' },
+    { code: 'wuxi', name: '无锡市' },
+    { code: 'changzhou', name: '常州市' },
+    { code: 'nantong', name: '南通市' },
+    { code: 'yangzhou', name: '扬州市' },
+    { code: 'zhenjiang', name: '镇江市' },
+    { code: 'xuzhou', name: '徐州市' },
+    { code: 'huaian', name: '淮安市' },
+    { code: 'yancheng', name: '盐城市' },
+    { code: 'taizhou_js', name: '泰州市' },
+    { code: 'lianyungang', name: '连云港市' }
+  ],
+  zhejiang: [
+    { code: 'hangzhou', name: '杭州市' },
+    { code: 'ningbo', name: '宁波市' },
+    { code: 'wenzhou', name: '温州市' },
+    { code: 'jiaxing', name: '嘉兴市' },
+    { code: 'huzhou', name: '湖州市' },
+    { code: 'shaoxing', name: '绍兴市' },
+    { code: 'jinhua', name: '金华市' },
+    { code: 'quzhou', name: '衢州市' },
+    { code: 'zhoushan', name: '舟山市' },
+    { code: 'taizhou_zj', name: '台州市' },
+    { code: 'lishui', name: '丽水市' }
+  ]
+}
+
+// 当前可选的市列表
+const currentCities = computed(() => {
+  if (!createForm.value.province) return []
+  return citiesData[createForm.value.province] || []
+})
+
+// 省份变化时清空市和县
+const onProvinceChange = () => {
+  createForm.value.city = ''
+  createForm.value.county = ''
+}
+
+// 市变化时清空县
+const onCityChange = () => {
+  createForm.value.county = ''
 }
 
 // 大类数据
@@ -322,6 +451,17 @@ const selectRegion = (region) => {
   store.config.regionName = region.name
 }
 
+// 获取省份名称
+const getProvinceName = (code) => {
+  return provinces.find(p => p.code === code)?.name || ''
+}
+
+// 获取市名称
+const getCityName = (provinceCode, cityCode) => {
+  const cities = citiesData[provinceCode] || []
+  return cities.find(c => c.code === cityCode)?.name || ''
+}
+
 // 创建地区
 const handleCreateRegion = async () => {
   try {
@@ -332,15 +472,25 @@ const handleCreateRegion = async () => {
 
   creating.value = true
   try {
+    // 组合地区名称：省+市+县
+    const provinceName = getProvinceName(createForm.value.province)
+    const cityName = getCityName(createForm.value.province, createForm.value.city)
+    const countyName = createForm.value.county
+    const fullName = `${provinceName}${cityName}${countyName}`
+
     const newRegion = await createRegion({
-      name: createForm.value.name,
+      name: fullName,
       category: selectedCategory.value,
       topic: selectedTopic.value,
-      item: selectedTopic.value // 暂时用 topic 作为 item
+      item: selectedTopic.value,
+      province: createForm.value.province,
+      city: createForm.value.city,
+      county: countyName
     })
     ElMessage.success('地区创建成功')
     showCreateDialog.value = false
-    createForm.value.name = ''
+    // 重置表单
+    createForm.value = { province: '', city: '', county: '' }
     await loadRegions()
     // 自动选中新创建的地区
     selectRegion(newRegion)
@@ -414,6 +564,11 @@ onMounted(async () => {
     version.value = data.version
   } catch {
     healthStatus.value = 'error'
+  }
+
+  // 恢复已有选择状态时，重新加载地区列表
+  if (selectedCategory.value && selectedTopic.value) {
+    await loadRegions()
   }
 })
 </script>

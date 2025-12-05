@@ -16,7 +16,8 @@
       "Bash(ruff format:*)",
       "Bash(python -m uvicorn:*)",
       "Bash(curl:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(del \"C:\\Users\\ECKin\\Desktop\\TRPC\\backend\\data\\projects.db\")"
     ],
     "deny": [],
     "ask": []

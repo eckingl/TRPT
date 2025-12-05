@@ -1,0 +1,1743 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox, scrolledtext
+import pandas as pd
+import chardet
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+import numpy as np
+from datetime import datetime
+from pypinyin import pinyin, Style
+import linecache
+
+SOIL_ATTR_CONFIG = {
+    # ========== 表3：土壤属性分级标准 ==========
+    'SRXYZL': {
+        'name': '水溶性盐总量',
+        'unit': 'g/kg',
+        'reverse_display': False,
+        'levels': [
+            (1, '1级', '无盐化'),
+            (2, '2级', '轻度盐化'),
+            (4, '3级', '中度盐化'),
+            (6, '4级', '重度盐化'),
+            (float('inf'), '5级', '盐土')
+        ]
+    },
+    'DDL': {
+        'name': '电导率',
+        'unit': 'mS/cm',
+        'reverse_display': False,
+        'levels': [
+            (0.4, '1级', '低'),
+            (0.8, '2级', '较低'),
+            (1.6, '3级', '中'),
+            (2.4, '4级', '较高'),
+            (float('inf'), '5级', '高')
+        ]
+    },
+    'ENA': {
+        'name': '交换性钠',
+        'unit': 'cmol(+)/kg',
+        'reverse_display': False,
+        'levels': [
+            (0.2, '1级', '低'),
+            (0.5, '2级', '较低'),
+            (0.8, '3级', '中'),
+            (1.2, '4级', '较高'),
+            (float('inf'), '5级', '高')
+        ]
+    },
+
+    'TRRZPJZ': {
+        'name': '土壤容重',
+        'unit': 'g/cm³',
+        'reverse_display': False,
+        'levels': [
+            (0.9, '1级', '不适宜'),
+            (1.1, '2级', '较适宜'),
+            (1.35, '3级', '适宜'),
+            (1.55, '4级', '较适宜'),
+            (float('inf'), '5级', '不适宜')
+        ]
+    },
+
+    'GZCHD': {
+        'name': '耕作层厚度',
+        'unit': 'cm',
+        'reverse_display': True,
+        'levels': [
+            (10, '5级', '薄'),
+            (15, '4级', '较薄'),
+            (20, '3级', '中'),
+            (25, '2级', '较厚'),
+            (float('inf'), '1级', '厚')
+        ]
+    },
+
+    'EK': {
+        'name': '交换性钾',
+        'unit': 'cmol(+)/kg',
+        'reverse_display': False,
+        'levels': [
+            (0.1, '1级', '无效钾'),
+            (0.2, '2级', '低效钾'),
+            (0.4, '3级', '中效钾'),
+            (float('inf'), '4级', '高效钾')
+        ]
+    },
+    'JHXYJZL': {
+        'name': '交换性盐基总量',
+        'unit': 'cmol(+)/kg',
+        'reverse_display': False,
+        'levels': [
+            (5, '1级', '低'),
+            (10, '2级', '较低'),
+            (15, '3级', '中'),
+            (20, '4级', '较高'),
+            (float('inf'), '5级', '高')
+        ]
+    },
+    '地表砾石丰度': {
+        'name': '地表砾石丰度',
+        'unit': '',
+        'reverse_display': True,
+        'levels': [
+            (float('inf'), '1级', '无')  # 定性描述，保留占位
+        ]
+    },
+    'SWXDTJT7': {
+        'name': '水稳性大团聚体',
+        'unit': 'mg/kg',
+        'reverse_display': False,
+        'levels': [
+            (10, '1级', '低'),
+            (20, '2级', '较低'),
+            (30, '3级', '中'),
+            (40, '4级', '较高'),
+            (float('inf'), '5级', '高')
+        ]
+    },
+    'OM': {
+        'name': '有机质',
+        'unit': 'g/kg',
+        'reverse_display': True,
+        'levels': [
+            (10, '5级', '低'),
+            (20, '4级', '较低'),
+            (30, '3级', '中'),
+            (40, '2级', '较高'),
+            (float('inf'), '1级', '高')
+        ]
+    },
+    'CEC': {
+        'name': '阳离子交换量',
+        'unit': 'cmol(+)/kg',
+        'reverse_display': True,
+        'levels': [
+            (5, '5级', '低'),
+            (10, '4级', '较低'),
+            (15, '3级', '中'),
+            (20, '2级', '较高'),
+            (float('inf'), '1级', '高')
+        ]
+    },
+    '碳酸钙': {
+        'name': '碳酸钙',
+        'unit': 'g/kg',
+        'reverse_display': True,
+        'levels': [
+            (10, '5级', '低'),
+            (30, '4级', '较低'),
+            (50, '3级', '中'),
+            (150, '2级', '较高'),
+            (float('inf'), '1级', '高')
+        ]
+    },
+    'TN': {
+        'name': '全氮',
+        'unit': 'g/kg',
+        'reverse_display': True,
+        'levels': [
+            (0.5, '5级', '极缺'),
+            (1.0, '4级', '缺乏'),
+            (1.5, '3级', '中等'),
+            (2.0, '2级', '较丰富'),
+            (float('inf'), '1级', '丰富')
+        ]
+    },
+    'TP': {
+        'name': '全磷',
+        'unit': 'g/kg',
+        'reverse_display': True,
+        'levels': [
+            (0.4, '5级', '极缺'),
+            (0.6, '4级', '缺乏'),
+            (0.8, '3级', '中等'),
+            (1.0, '2级', '较丰富'),
+            (float('inf'), '1级', '丰富')
+        ]
+    },
+    'TK': {
+        'name': '全钾',
+        'unit': 'g/kg',
+        'reverse_display': True,
+        'levels': [
+            (10, '5级', '极缺'),
+            (15, '4级', '缺乏'),
+            (20, '3级', '中等'),
+            (25, '2级', '较丰富'),
+            (float('inf'), '1级', '丰富')
+        ]
+    },
+    'AP': {
+        'name': '有效磷',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (5, '5级', '极缺'),
+            (10, '4级', '缺乏'),
+            (20, '3级', '中等'),
+            (40, '2级', '较丰富'),
+            (float('inf'), '1级', '丰富')
+        ]
+    },
+    'AK': {
+        'name': '速效钾',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (50, '5级', '极缺'),
+            (100, '4级', '缺乏'),
+            (150, '3级', '中等'),
+            (200, '2级', '较丰富'),
+            (float('inf'), '1级', '丰富')
+        ]
+    },
+    'SK': {
+        'name': '缓效钾',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (100, '5级', '极缺'),
+            (300, '4级', '缺乏'),
+            (500, '3级', '中等'),
+            (700, '2级', '较丰富'),
+            (float('inf'), '1级', '丰富')
+        ]
+    },
+    'ECA': {
+        'name': '交换性钙',
+        'unit': 'cmol(1/2Ca²⁺)/kg',
+        'reverse_display': True,
+        'levels': [
+            (1.0, '5级', '极缺'),
+            (4.0, '4级', '缺乏'),
+            (10.0, '3级', '中等'),
+            (15.0, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'EMG': {
+        'name': '交换性镁',
+        'unit': 'cmol(1/2Mg²⁺)/kg',
+        'reverse_display': True,
+        'levels': [
+            (0.5, '5级', '极缺'),
+            (1.0, '4级', '缺乏'),
+            (1.5, '3级', '中等'),
+            (2.0, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'AS1': {
+        'name': '有效硫',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (10.0, '5级', '极缺'),
+            (20.0, '4级', '缺乏'),
+            (30.0, '3级', '中等'),
+            (40.0, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'ASI': {
+        'name': '有效硅',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (50, '5级', '极缺'),
+            (100, '4级', '缺乏'),
+            (150, '3级', '中等'),
+            (250, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'AFE': {
+        'name': '有效铁',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (2.5, '5级', '极缺'),
+            (4.5, '4级', '缺乏'),
+            (10.0, '3级', '中等'),
+            (20.0, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'AMN': {
+        'name': '有效锰',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (1.0, '5级', '极缺'),
+            (5.0, '4级', '缺乏'),
+            (15.0, '3级', '中等'),
+            (30.0, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'ACU': {
+        'name': '有效铜',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (0.2, '5级', '极缺'),
+            (0.5, '4级', '缺乏'),
+            (1.0, '3级', '中等'),
+            (2.0, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'AZN': {
+        'name': '有效锌',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (0.5, '5级', '极缺'),
+            (1.0, '4级', '缺乏'),
+            (2.0, '3级', '中等'),
+            (3.0, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'AB': {
+        'name': '有效硼',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (0.2, '5级', '极缺'),
+            (0.5, '4级', '缺乏'),
+            (1.0, '3级', '中等'),
+            (2.0, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+    'AMO': {
+        'name': '有效钼',
+        'unit': 'mg/kg',
+        'reverse_display': True,
+        'levels': [
+            (0.10, '5级', '极缺'),
+            (0.15, '4级', '缺乏'),
+            (0.20, '3级', '中等'),
+            (0.30, '2级', '丰富'),
+            (float('inf'), '1级', '偏高')
+        ]
+    },
+
+    # ========== 表4：土壤 pH 值分级标准 ==========
+    'ph': {
+        'name': 'pH',
+        'unit': '',
+        'reverse_display': True,
+        'levels': [
+            (4.5, '1级', '强酸性'),
+            (5.5, '2级', '酸性'),
+            (6.5, '3级', '弱酸性'),
+            (7.5, '4级', '中性'),
+            (8.5, '5级', '弱碱性'),
+            (9.0, '6级', '碱性'),
+            (14.0, '7级', '强碱性')
+        ]
+    },
+
+    # ========== 表5：其他指标分级标准（讨论稿）==========
+    '有效土层厚度': {
+        'name': '有效土层厚度',
+        'unit': 'cm',
+        'reverse_display': True,
+        'levels': [
+            (10, '5级', '≤10'),
+            (30, '4级', '10~30'),
+            (50, '3级', '30~50'),
+            (80, '2级', '50~80'),
+            (float('inf'), '1级', '80~120')
+        ]
+    },
+    '机械组成-砂粒': {
+        'name': '机械组成-砂粒',
+        'unit': '%',
+        'reverse_display': True,
+        'levels': [
+            (15, '5级', '≤15'),
+            (25, '4级', '15~25'),
+            (45, '3级', '25~45'),
+            (65, '2级', '45~65'),
+            (float('inf'), '1级', '65~100')
+        ]
+    },
+    '机械组成-粉粒': {
+        'name': '机械组成-粉粒',
+        'unit': '%',
+        'reverse_display': True,
+        'levels': [
+            (15, '5级', '≤15'),
+            (25, '4级', '15~25'),
+            (45, '3级', '25~45'),
+            (65, '2级', '45~65'),
+            (float('inf'), '1级', '65~100')
+        ]
+    },
+    '机械组成-黏粒': {
+        'name': '机械组成-黏粒',
+        'unit': '%',
+        'reverse_display': True,
+        'levels': [
+            (15, '5级', '≤15'),
+            (25, '4级', '15~25'),
+            (45, '3级', '25~45'),
+            (65, '2级', '45~65'),
+            (float('inf'), '1级', '65~100')
+        ]
+    }
+}
+
+def format_small_value(value):
+    """
+    格式化小数值:
+    - 大于等于 0.001: 显示3位小数
+    - 小于 0.001: 使用科学计数法显示（保留3位有效数字）
+    例如: 0.000041 显示为 4.1e-05
+    """
+    if pd.isna(value):
+        return value
+    
+    if value == 0:
+        return 0
+    
+    abs_val = abs(value)
+    
+    # 大于等于 0.001，正常显示3位小数
+    if abs_val >= 0.001:
+        return round(value, 3)
+    
+    # 小于 0.001，使用科学计数法（保留3位有效数字）
+    import math
+    # 使用格式化字符串，保留3位有效数字
+    formatted = f"{value:.3g}"
+    # 如果格式化后是普通数字（没有e），转为float返回
+    # 如果是科学计数法，保持字符串格式
+    if 'e' in formatted.lower():
+        return formatted
+    else:
+        return float(formatted)
+
+
+def format_percentage(value):
+    """
+    格式化百分比数值:
+    - 如果超过100，显示100
+    - 否则按照 format_small_value 逻辑处理
+    """
+    if pd.isna(value):
+        return value
+    
+    # 如果超过100，显示100
+    if value > 100:
+        return 100
+    
+    return format_small_value(value)
+
+def normalize_attr_column_name(col_name: str) -> str:
+    """将原始列名映射为 SOIL_ATTR_CONFIG 中的标准键"""
+    if pd.isna(col_name):
+        return ""
+    col_str = str(col_name).strip()
+
+    # 显式别名映射（根据常见情况扩展）
+    alias_map = {
+        'pH': 'ph',
+        'PH': 'ph',
+        '酸碱度': 'ph',
+        '有机质含量': 'OM',
+        '有机质(g/kg)': 'OM',
+        '全氮含量': 'TN',
+        '有效磷(P)': 'AP',
+        '速效钾(K)': 'AK',
+        '阳离子交换量(CEC)': 'CEC',
+        '水溶性盐': 'SRXYZL',
+        '电导率(EC)': 'DDL',
+        '有效土层厚度(cm)': '有效土层厚度',
+        # 可继续添加...
+    }
+
+    # 先查别名
+    if col_str in alias_map:
+        return alias_map[col_str]
+
+    # 再直接匹配（不区分大小写）
+    for key in SOIL_ATTR_CONFIG.keys():
+        if col_str.lower() == key.lower():
+            return key
+
+    # 否则返回原字符串（大概率不在配置中）
+    return col_str
+
+
+def classify_by_config(value, attr_key):
+    """根据配置字典对属性值进行分级"""
+    if pd.isna(value):
+        return None
+    # 只统计大于0的值,0值和负值不参与分级
+    if value <= 0:
+        return None
+    config = SOIL_ATTR_CONFIG.get(attr_key)
+    if not config:
+        return None
+
+    # 罗马数字映射
+    roman_map = {
+        '1级': 'Ⅰ级',
+        '2级': 'Ⅱ级',
+        '3级': 'Ⅲ级',
+        '4级': 'Ⅳ级',
+        '5级': 'Ⅴ级',
+        '6级': 'Ⅵ级',
+        '7级': 'Ⅶ级'
+    }
+
+    if attr_key == 'ph':
+        for threshold, level, _ in config['levels']:
+            if value <= threshold:
+                return roman_map.get(level, level)
+    else:
+        for i, (threshold, level, _) in enumerate(config['levels']):
+            if value <= threshold:
+                return roman_map.get(level, level)
+    return None
+
+
+def detect_available_attributes(df_columns, config_keys):
+    """
+    检测 DataFrame 列中哪些可以匹配到 SOIL_ATTR_CONFIG
+    返回：[(原始列名, 标准键), ...]
+    """
+    available = []
+    for col in df_columns:
+        norm_key = normalize_attr_column_name(col)
+        if norm_key in config_keys:
+            available.append((col, norm_key))
+    return available
+
+
+def rename_attr_column_in_df(df, attr_key):
+    """将数据框中与 attr_key 相关的列（不区分大小写）统一重命名为 attr_key"""
+    target_col = None
+    for col in df.columns:
+        if col.strip().lower() == attr_key.lower():
+            target_col = col
+            break
+    if target_col is None:
+        config = SOIL_ATTR_CONFIG.get(attr_key, {})
+        chinese_name = config.get('name', '')
+        for col in df.columns:
+            if col.strip() == chinese_name:
+                target_col = col
+                break
+    if target_col is None:
+        raise ValueError(f"未找到名为 '{attr_key}' 或其中文名的列")
+    df = df.rename(columns={target_col: attr_key})
+    return df
+
+
+
+def get_level_range(attr_key):
+    """获取属性各级别的范围描述列表，按1级到5/7级顺序"""
+    config = SOIL_ATTR_CONFIG.get(attr_key)
+    if not config:
+        return []
+    if attr_key == 'ph':
+        return [desc for _, _, desc in config['levels']]
+    else:
+        descs = [desc for _, _, desc in config['levels']]
+        if config.get('reverse_display', False):
+            return list(reversed(descs))
+        else:
+            return descs  # 不反转
+
+
+def get_grade_order(attr_key):
+    """获取属性级别的排序列表"""
+    if attr_key == 'ph':
+        return ['Ⅰ级', 'Ⅱ级', 'Ⅲ级', 'Ⅳ级', 'Ⅴ级', 'Ⅵ级', 'Ⅶ级']
+    else:
+        return ['Ⅰ级', 'Ⅱ级', 'Ⅲ级', 'Ⅳ级', 'Ⅴ级']
+
+
+def get_level_value_ranges(attr_key):
+    """获取属性各级别的数值范围字符串列表,按 1级到 5/7级顺序"""
+    config = SOIL_ATTR_CONFIG.get(attr_key)
+    if not config:
+        return []
+
+    levels = config['levels']
+    if attr_key == 'ph':
+        ranges = []
+        for i, (threshold, level, desc) in enumerate(levels):
+            if i == 0:
+                ranges.append(f"≤{threshold}")
+            elif i == len(levels) - 1:
+                # 最后一级显示为>前一级阈值
+                ranges.append(f">{levels[i-1][0]}")
+            else:
+                prev = levels[i-1][0]
+                # 中间级别显示区间
+                ranges.append(f"{prev}～{threshold}")
+        return ranges
+    else:
+        # 构建从低到高的数值区间(按 levels 顺序)
+        ranges = []
+        for i, (threshold, level, desc) in enumerate(levels):
+            if i == 0:
+                ranges.append(f"≤{threshold}")
+            elif i == len(levels) - 1:
+                ranges.append(f">{levels[i-1][0]}")
+            else:
+                # 中间级别显示区间
+                prev = levels[i-1][0]
+                ranges.append(f"{prev}～{threshold}")
+
+        # 根据 reverse_display 决定是否反转
+        if config.get('reverse_display', False):
+            return list(reversed(ranges))
+        else:
+            return ranges
+
+
+def get_pinyin_first_letter(text):
+    """获取中文文本的拼音首字母，用于排序"""
+    try:
+        from pypinyin import pinyin, Style
+        return ''.join([p[0][0].upper() for p in pinyin(text, style=Style.FIRST_LETTER)])
+    except:
+        return text
+
+
+def generate_overall_summary_to_ws(ws, df_sample, df_area, attr_key):
+    config = SOIL_ATTR_CONFIG[attr_key]
+    attr_name = config['name']
+    unit = config['unit']
+    ws.title = f"{attr_name}总体情况"
+
+    grade_order = get_grade_order(attr_key)
+    # 使用数值范围而不是定性描述
+    range_desc = get_level_value_ranges(attr_key)
+
+    # 完全独立处理样点数据（只统计大于0的值）
+    df_sample_clean = df_sample.copy()
+    df_sample_clean[attr_key] = pd.to_numeric(df_sample_clean[attr_key], errors='coerce')
+    # 只保留大于0的值
+    df_sample_clean = df_sample_clean[(df_sample_clean[attr_key] > 0) & (df_sample_clean[attr_key].notna())].copy()
+    df_sample_clean['等级'] = df_sample_clean[attr_key].apply(lambda x: classify_by_config(x, attr_key))
+
+    # 完全独立处理制图数据（只统计大于0的值）
+    df_area_clean = df_area.copy()
+    df_area_clean[attr_key] = pd.to_numeric(df_area_clean[attr_key], errors='coerce')
+    # 只保留大于0的值
+    df_area_clean = df_area_clean[(df_area_clean[attr_key] > 0) & (df_area_clean[attr_key].notna())].copy()
+    df_area_clean['等级'] = df_area_clean[attr_key].apply(lambda x: classify_by_config(x, attr_key))
+
+    # 样点统计
+    total_samples = len(df_sample_clean)
+   
+    
+    sample_counts = {g: 0 for g in grade_order}
+    for grade in df_sample_clean['等级'].dropna():
+        if grade in sample_counts:
+            sample_counts[grade] += 1
+
+    
+    sample_pct = {
+        g: round(sample_counts[g] / total_samples * 100, 2) if total_samples > 0 else 0.00
+        for g in grade_order
+    }
+ 
+
+    # 制图统计
+    area_sum = {g: 0.0 for g in grade_order}
+  
+    for _, row in df_area_clean.iterrows():
+        grade = row['等级']
+        if pd.notna(grade) and grade in area_sum:
+            area_sum[grade] += float(row['面积']) if '面积' in row and pd.notna(row['面积']) else 0.0
+    total_area = sum(area_sum.values())
+  
+    
+    area_pct = {
+        g: round(area_sum[g] / total_area * 100, 2) if total_area > 0 else 0.00
+        for g in grade_order
+    }
+
+
+    # 样点统计数值
+    sample_mean = df_sample_clean[attr_key].mean() if total_samples > 0 else 0
+    sample_median = df_sample_clean[attr_key].median() if total_samples > 0 else 0
+    sample_min = df_sample_clean[attr_key].min() if total_samples > 0 else 0
+    sample_max = df_sample_clean[attr_key].max() if total_samples > 0 else 0
+
+    # 制图统计数值
+    area_mean = df_area_clean[attr_key].mean() if len(df_area_clean) > 0 else 0
+    area_median = df_area_clean[attr_key].median() if len(df_area_clean) > 0 else 0
+    area_min = df_area_clean[attr_key].min() if len(df_area_clean) > 0 else 0
+    area_max = df_area_clean[attr_key].max() if len(df_area_clean) > 0 else 0
+
+    ws.merge_cells('A1:F1')
+    # 标题不显示单位
+    ws['A1'] = f'土壤{attr_name}分级分布统计'
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    ws.merge_cells('A2:B2')
+    ws['A2'] = '土壤三普分级'
+    ws['A2'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells('C2:D2')
+    ws['C2'] = '样点统计'
+    ws['C2'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells('E2:F2')
+    ws['E2'] = '制图统计'
+    ws['E2'].alignment = Alignment(horizontal='center', vertical='center')
+
+    # pH 值域列不加单位括号，其他属性正常显示
+    if attr_key == 'ph':
+        ws['A3'], ws['B3'] = '分级', '值域'
+    else:
+        ws['A3'], ws['B3'] = '分级', f'值域/({unit})'
+    ws['C3'], ws['D3'] = '数量/个', '占比/%'
+    ws['E3'], ws['F3'] = '面积/亩', '占比/%'
+
+    max_rows = len(grade_order)
+    for i in range(max_rows):
+        row = 4 + i
+        grade = grade_order[i]
+        rng = range_desc[i] if i < len(range_desc) else ''
+        ws.cell(row, 1, grade)
+        ws.cell(row, 2, rng)
+        ws.cell(row, 3, sample_counts.get(grade, 0))
+        ws.cell(row, 4, format_percentage(sample_pct.get(grade, 0.00)))
+        ws.cell(row, 5, format_small_value(area_sum.get(grade, 0.0)))
+        ws.cell(row, 6, format_percentage(area_pct.get(grade, 0.00)))
+
+    summary_row = 4 + max_rows
+    ws.merge_cells(f'A{summary_row}:B{summary_row}')
+    ws[f'A{summary_row}'] = '全区'
+    ws[f'A{summary_row}'].alignment = Alignment(horizontal='center', vertical='center')
+    ws[f'C{summary_row}'] = sum(sample_counts.get(g, 0) for g in grade_order)
+    ws[f'D{summary_row}'] = format_percentage(sum(sample_pct.get(g, 0) for g in grade_order))
+    ws[f'E{summary_row}'] = format_small_value(sum(area_sum.get(g, 0) for g in grade_order))
+    ws[f'F{summary_row}'] = format_percentage(sum(area_pct.get(g, 0) for g in grade_order))
+
+    stat_row = summary_row + 1
+    ws.merge_cells(f'A{stat_row}:B{stat_row}')
+    if attr_key == 'ph':
+        ws[f'A{stat_row}'] = '全区均值'
+    else:
+        ws[f'A{stat_row}'] = f'全区均值/({unit})'
+    ws[f'A{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells(f'C{stat_row}:D{stat_row}')
+    ws[f'C{stat_row}'] = f"{sample_mean:.3f}"
+    ws[f'C{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells(f'E{stat_row}:F{stat_row}')
+    ws[f'E{stat_row}'] = f"{area_mean:.3f}"
+    ws[f'E{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+
+    stat_row += 1
+    ws.merge_cells(f'A{stat_row}:B{stat_row}')
+    if attr_key == 'ph':
+        ws[f'A{stat_row}'] = '全区中位值'
+    else:
+        ws[f'A{stat_row}'] = f'全区中位值/({unit})'
+    ws[f'A{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells(f'C{stat_row}:D{stat_row}')
+    ws[f'C{stat_row}'] = f"{sample_median:.3f}"
+    ws[f'C{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells(f'E{stat_row}:F{stat_row}')
+    ws[f'E{stat_row}'] = f"{area_median:.3f}"
+    ws[f'E{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+
+    stat_row += 1
+    ws.merge_cells(f'A{stat_row}:B{stat_row}')
+    if attr_key == 'ph':
+        ws[f'A{stat_row}'] = '全区范围'
+    else:
+        ws[f'A{stat_row}'] = f'全区范围/({unit})'
+    ws[f'A{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells(f'C{stat_row}:D{stat_row}')
+    ws[f'C{stat_row}'] = f"{sample_min:.3f}～{sample_max:.3f}"
+    ws[f'C{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells(f'E{stat_row}:F{stat_row}')
+    ws[f'E{stat_row}'] = f"{area_min:.3f}～{area_max:.3f}"
+    ws[f'E{stat_row}'].alignment = Alignment(horizontal='center', vertical='center')
+
+    thin = Side(border_style="thin")
+    border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    max_format_row = stat_row
+    for row in ws.iter_rows(min_row=1, max_row=max_format_row, min_col=1, max_col=6):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
+
+    for col in range(1, 7):
+        ws.cell(2, col).font = Font(bold=True)
+        ws.cell(3, col).font = Font(bold=True)
+    for r in range(4, 4 + max_rows):
+        ws.cell(r, 1).font = Font(bold=True)
+
+    for i, col in enumerate(['A', 'B', 'C', 'D', 'E', 'F'], start=1):
+        ws.column_dimensions[col].width = 12 if i > 2 else 14
+
+
+def ensure_land_class_column(df):
+    # 统一二级地类列名为 '二级地类'，兼容 'DLMC'（不区分大小写）
+    if '二级地类' in df.columns:
+        return df
+    for col in df.columns:
+        if str(col).strip().upper() == 'DLMC':
+            return df.rename(columns={col: '二级地类'})
+    raise ValueError("未找到二级地类列（期望列名：'二级地类' 或 'DLMC'）")
+
+def get_land_class(dlmc):
+    """将二级地类映射为 (一级地类, 二级地类)"""
+    if pd.isna(dlmc):
+        return None
+    s = str(dlmc).strip()
+    if s in ["水田", "水浇地", "旱地"]:
+        return ("耕地", s)
+    elif s in ["果园", "茶园"]:
+        return ("园地", s)
+    elif "园地" in s:
+        return ("园地", "其他园地")
+    elif "林地" in s:
+        return ("林地", "林地")
+    elif "草地" in s:
+        return ("草地", "草地")
+    else:
+        return ("其他", "其他")
+
+def generate_land_use_summary_to_ws(ws, df_sample, df_area, attr_key):
+    config = SOIL_ATTR_CONFIG[attr_key]
+    attr_name = config['name']
+    unit = config['unit']
+    ws.title = f"{attr_name}不同土地利用类型"
+
+    # 完全独立处理样点数据（只统计大于0的值）
+    df_sample_clean = df_sample.copy()
+    df_sample_clean[attr_key] = pd.to_numeric(df_sample_clean[attr_key], errors='coerce')
+    df_sample_clean = df_sample_clean[(df_sample_clean[attr_key] > 0) & (df_sample_clean[attr_key].notna())].copy()
+    df_sample_clean = ensure_land_class_column(df_sample_clean)
+    df_sample_clean[['一级', '二级']] = df_sample_clean['二级地类'].apply(get_land_class).apply(pd.Series)
+    df_sample_clean = df_sample_clean.dropna(subset=['一级'])
+
+    # 完全独立处理制图数据（只统计大于0的值）
+    df_area_clean = df_area.copy()
+    df_area_clean[attr_key] = pd.to_numeric(df_area_clean[attr_key], errors='coerce')
+    df_area_clean = df_area_clean[(df_area_clean[attr_key] > 0) & (df_area_clean[attr_key].notna())].copy()
+    df_area_clean = ensure_land_class_column(df_area_clean)
+    df_area_clean[['一级', '二级']] = df_area_clean['二级地类'].apply(get_land_class).apply(pd.Series)
+    df_area_clean = df_area_clean.dropna(subset=['一级'])
+
+    ws.merge_cells('A1:I1')
+    # 标题不显示单位
+    ws['A1'] = f'不同土地利用类型{attr_name}统计'
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    ws.merge_cells('A2:A3')
+    ws['A2'] = '一级'
+    ws['A2'].font = Font(bold=True)
+    ws['A2'].alignment = Alignment(horizontal='center', vertical='center')
+    
+    ws.merge_cells('B2:B3')
+    ws['B2'] = '二级'
+    ws['B2'].font = Font(bold=True)
+    ws['B2'].alignment = Alignment(horizontal='center', vertical='center')
+    
+    ws.merge_cells('C2:F2')
+    ws['C2'] = '样点统计'
+    ws['C2'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells('G2:I2')
+    ws['G2'] = '制图统计'
+    ws['G2'].alignment = Alignment(horizontal='center', vertical='center')
+
+    # pH 列标题不显示单位，其他属性正常显示
+    if attr_key == 'ph':
+        ws['C3'] = '均值'
+        ws['D3'] = '中位数'
+        ws['E3'] = '范围'
+        ws['G3'] = '均值'
+        ws['I3'] = '范围'
+    else:
+        ws['C3'] = f'均值/({unit})'
+        ws['D3'] = f'中位数/({unit})'
+        ws['E3'] = f'范围/({unit})'
+        ws['G3'] = f'均值/({unit})'
+        ws['I3'] = f'范围/({unit})'
+    ws['F3'] = '数量/个'
+    ws['H3'] = '面积/亩'
+
+    for col in ['C', 'D', 'E', 'F', 'G', 'H', 'I']:
+        ws[col + '2'].font = Font(bold=True)
+        ws[col + '3'].font = Font(bold=True)
+
+    current_row = 4
+    land_config = {
+        "耕地": ["水田", "水浇地", "旱地"],
+        "园地": ["果园", "茶园", "其他园地"],
+        "林地": ["林地"],
+        "草地": ["草地"],
+        "其他": ["其他"]
+    }
+
+    start_row_map = {}
+
+    for primary, secondaries in land_config.items():
+        sample_primary = df_sample_clean[df_sample_clean['一级'] == primary]
+        area_primary = df_area_clean[df_area_clean['一级'] == primary]
+
+        total_count_p = 0
+        total_area_p = 0.0
+        vals_all_sample = []
+        vals_all_area = []  # ← 新增：用于存储制图数据的值
+
+        start_row_map[primary] = current_row
+
+        for idx, sec in enumerate(secondaries):
+            if primary in ["林地", "草地"]:
+                sample_sec = sample_primary
+                area_sec = area_primary
+            else:
+                sample_sec = sample_primary[sample_primary['二级'] == sec]
+                area_sec = area_primary[area_primary['二级'] == sec]
+
+            count = len(sample_sec)
+            vals_s = sample_sec[attr_key].dropna() if not sample_sec.empty else pd.Series([], dtype='float64')
+
+            mean_sample = f"{vals_s.mean():.3f}" if count > 0 and not vals_s.empty else ""
+            median_sample = f"{vals_s.median():.3f}" if count > 0 and not vals_s.empty else ""
+            range_sample = f"{vals_s.min():.3f}～{vals_s.max():.3f}" if count > 0 and not vals_s.empty else ""
+
+            if not area_sec.empty and '面积' in area_sec.columns:
+                area_val = area_sec['面积'].sum()
+                vals_a = area_sec[attr_key].dropna()  # 制图数据已排除0值
+                mean_area = f"{vals_a.mean():.3f}" if len(vals_a) > 0 else ""
+                range_area = f"{vals_a.min():.3f}～{vals_a.max():.3f}" if len(vals_a) > 0 else ""
+                # 收集制图值用于合计
+                vals_all_area.extend(vals_a.tolist())
+            else:
+                area_val = 0.0
+                mean_area = ""
+                range_area = ""
+
+            if idx == 0:
+                ws.cell(row=current_row, column=1, value=primary)
+            else:
+                ws.cell(row=current_row, column=1, value="")
+
+            ws.cell(row=current_row, column=2, value=sec)
+            ws.cell(row=current_row, column=3, value=mean_sample)
+            ws.cell(row=current_row, column=4, value=median_sample)
+            ws.cell(row=current_row, column=5, value=range_sample)
+            ws.cell(row=current_row, column=6, value=count)
+            ws.cell(row=current_row, column=7, value=mean_area)
+            ws.cell(row=current_row, column=8, value=format_small_value(area_val))
+            ws.cell(row=current_row, column=9, value=range_area)
+
+            total_count_p += count
+            total_area_p += area_val
+            vals_all_sample.extend(vals_s.tolist())
+            current_row += 1
+
+        # ========== 关键修复：合计行使用各自的数据源 ==========
+        if primary in ["耕地", "园地"]:
+            # 样点合计
+            vals_series_sample = pd.Series(vals_all_sample)
+            mean_all_sample = f"{vals_series_sample.mean():.3f}" if len(vals_series_sample) > 0 else ""
+            median_all_sample = f"{vals_series_sample.median():.3f}" if len(vals_series_sample) > 0 else ""
+            range_all_sample = f"{vals_series_sample.min():.3f}～{vals_series_sample.max():.3f}" if len(vals_series_sample) > 0 else ""
+
+            # 制图合计 ← 使用 vals_all_area 而非 vals_all_sample
+            vals_series_area = pd.Series(vals_all_area)
+            mean_all_area = f"{vals_series_area.mean():.3f}" if len(vals_series_area) > 0 else ""
+            range_all_area = f"{vals_series_area.min():.3f}～{vals_series_area.max():.3f}" if len(vals_series_area) > 0 else ""
+
+            ws.cell(row=current_row, column=1, value="")
+            ws.cell(row=current_row, column=2, value="合计")
+            ws.cell(row=current_row, column=3, value=mean_all_sample)
+            ws.cell(row=current_row, column=4, value=median_all_sample)
+            ws.cell(row=current_row, column=5, value=range_all_sample)
+            ws.cell(row=current_row, column=6, value=total_count_p)
+            ws.cell(row=current_row, column=7, value=mean_all_area)      # ← 修复点
+            ws.cell(row=current_row, column=8, value=format_small_value(total_area_p))
+            ws.cell(row=current_row, column=9, value=range_all_area)     # ← 修复点
+            current_row += 1
+
+            end_row = current_row - 1
+            ws.merge_cells(f'A{start_row_map[primary]}:A{end_row}')
+            ws.cell(row=start_row_map[primary], column=1).alignment = Alignment(vertical='center')
+
+    # 全区统计（使用独立数据源）
+    all_vals_sample_global = df_sample_clean[attr_key].dropna()
+    global_total_count = len(all_vals_sample_global)
+    global_mean_sample = f"{all_vals_sample_global.mean():.3f}" if len(all_vals_sample_global) > 0 else ""
+    global_median_sample = f"{all_vals_sample_global.median():.3f}" if len(all_vals_sample_global) > 0 else ""
+    global_range_sample = f"{all_vals_sample_global.min():.3f}～{all_vals_sample_global.max():.3f}" if len(all_vals_sample_global) > 0 else ""
+
+    all_vals_area_global = df_area_clean[attr_key].dropna()
+    global_total_area = df_area_clean['面积'].sum() if '面积' in df_area_clean.columns else 0
+    global_mean_area = f"{all_vals_area_global.mean():.3f}" if len(all_vals_area_global) > 0 else ""
+    global_range_area = f"{all_vals_area_global.min():.3f}～{all_vals_area_global.max():.3f}" if len(all_vals_area_global) > 0 else ""
+
+    # 合并“全区”行的一级和二级列
+    ws.merge_cells(f'A{current_row}:B{current_row}')
+    ws.cell(row=current_row, column=1, value="全区")
+    ws.cell(row=current_row, column=1).alignment = Alignment(horizontal='center', vertical='center')
+    ws.cell(row=current_row, column=3, value=global_mean_sample)
+    ws.cell(row=current_row, column=4, value=global_median_sample)
+    ws.cell(row=current_row, column=5, value=global_range_sample)
+    ws.cell(row=current_row, column=6, value=global_total_count)
+    ws.cell(row=current_row, column=7, value=global_mean_area)
+    ws.cell(row=current_row, column=8, value=format_small_value(global_total_area))
+    ws.cell(row=current_row, column=9, value=global_range_area)
+
+    thin = Side(border_style="thin")
+    border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    for row in ws.iter_rows(min_row=1, max_row=current_row, min_col=1, max_col=9):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
+
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']:
+        ws.column_dimensions[col].width = 12
+
+
+def generate_town_summary_to_ws(ws, df_sample, df_area, attr_key):
+    config = SOIL_ATTR_CONFIG[attr_key]
+    attr_name = config['name']
+    unit = config['unit']
+    ws.title = f"{attr_name}分乡镇统计"
+
+    # 添加标题行（第1行）
+    ws.merge_cells('A1:F1')
+    # 标题不显示单位
+    ws['A1'] = f'不同乡镇{attr_name}统计'
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    # 第2行：区县和两大类别
+    ws.merge_cells('A2:A3')
+    ws['A2'] = '区县'
+    ws['A2'].font = Font(bold=True, size=12)
+    ws['A2'].alignment = Alignment(horizontal='center', vertical='center')
+
+    ws.merge_cells('B2:D2')
+    ws['B2'] = '样点统计'
+    ws['B2'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells('E2:F2')
+    ws['E2'] = '制图统计'
+    ws['E2'].alignment = Alignment(horizontal='center', vertical='center')
+
+    # 第3行：列标题，pH 不显示单位
+    if attr_key == 'ph':
+        ws['B3'], ws['C3'], ws['D3'], ws['E3'], ws['F3'] = \
+            '均值', '范围', '数量/个', '均值', '面积/亩'
+    else:
+        ws['B3'], ws['C3'], ws['D3'], ws['E3'], ws['F3'] = \
+            f'均值/({unit})', f'范围/({unit})', '数量/个', f'均值/({unit})', '面积/亩'
+
+    for col in ['A', 'B', 'C', 'D', 'E', 'F']:
+        ws[col + '2'].font = Font(bold=True)
+        ws[col + '3'].font = Font(bold=True)
+
+    # 完全独立处理样点数据（只统计大于0的值）
+    df_sample_clean = df_sample.copy()
+    df_sample_clean[attr_key] = pd.to_numeric(df_sample_clean[attr_key], errors='coerce')
+    df_sample_clean = df_sample_clean[(df_sample_clean[attr_key] > 0) & (df_sample_clean[attr_key].notna())].copy()
+
+    # 完全独立处理制图数据（只统计大于0的值）
+    df_area_clean = df_area.copy()
+    df_area_clean[attr_key] = pd.to_numeric(df_area_clean[attr_key], errors='coerce')
+    df_area_clean = df_area_clean[(df_area_clean[attr_key] > 0) & (df_area_clean[attr_key].notna())].copy()
+
+    towns_sample = df_sample_clean['行政区名称'].dropna().astype(str).unique()
+    towns_area = df_area_clean['行政区名称'].dropna().astype(str).unique()
+    all_towns = np.union1d(towns_sample, towns_area)
+    # 按拼音首字母排序
+    all_towns = sorted(all_towns, key=get_pinyin_first_letter)
+
+    current_row = 4  # 从第4行开始填充数据
+
+    for town in all_towns:
+        sample_town = df_sample_clean[df_sample_clean['行政区名称'] == town]
+        vals = sample_town[attr_key].dropna()
+        count = len(vals)
+        mean_sample = round(vals.mean(), 3) if count > 0 else ""
+        range_sample = f"{vals.min():.3f}～{vals.max():.3f}" if count > 0 else ""
+
+        area_town = df_area_clean[df_area_clean['行政区名称'] == town]
+        area_sum = area_town['面积'].sum() if '面积' in area_town.columns and not area_town.empty else 0
+        vals_area = area_town[attr_key].dropna()  # 制图数据已排除0值
+        mean_area = round(vals_area.mean(), 3) if len(vals_area) > 0 else ""
+
+        ws.cell(row=current_row, column=1, value=town)
+        ws.cell(row=current_row, column=2, value=mean_sample)
+        ws.cell(row=current_row, column=3, value=range_sample)
+        ws.cell(row=current_row, column=4, value=count)
+        ws.cell(row=current_row, column=5, value=mean_area)
+        ws.cell(row=current_row, column=6, value=format_small_value(area_sum))
+        current_row += 1
+
+    vals_all_sample = df_sample_clean[attr_key].dropna()
+    count_all = len(vals_all_sample)
+    mean_sample_all = round(vals_all_sample.mean(), 3) if count_all > 0 else ""
+    range_sample_all = f"{vals_all_sample.min():.3f}～{vals_all_sample.max():.3f}" if count_all > 0 else ""
+
+    area_sum_all = df_area_clean['面积'].sum() if '面积' in df_area_clean.columns else 0
+    vals_area_all = df_area_clean[attr_key].dropna()  # 制图数据已排除0值
+    mean_area_all = round(vals_area_all.mean(), 3) if len(vals_area_all) > 0 else ""
+
+    ws.cell(row=current_row, column=1, value="全区")
+    ws.cell(row=current_row, column=2, value=mean_sample_all)
+    ws.cell(row=current_row, column=3, value=range_sample_all)
+    ws.cell(row=current_row, column=4, value=count_all)
+    ws.cell(row=current_row, column=5, value=mean_area_all)
+    ws.cell(row=current_row, column=6, value=format_small_value(area_sum_all))
+
+    thin = Side(border_style="thin")
+    border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    for row in ws.iter_rows(min_row=1, max_row=current_row, min_col=1, max_col=6):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
+
+    for col in ['A', 'B', 'C', 'D', 'E', 'F']:
+        ws.column_dimensions[col].width = 12
+
+
+def generate_soil_type_summary_to_ws(ws, df_sample, df_area, attr_key):
+    config = SOIL_ATTR_CONFIG[attr_key]
+    attr_name = config['name']
+    unit = config['unit']
+    ws.title = f"{attr_name}分土壤类型"
+
+    # 完全独立处理样点数据（只统计大于0的值）
+    df_sample_clean = df_sample.copy()
+    df_sample_clean[attr_key] = pd.to_numeric(df_sample_clean[attr_key], errors='coerce')
+    df_sample_clean = df_sample_clean[(df_sample_clean[attr_key] > 0) & (df_sample_clean[attr_key].notna())].copy()
+
+    # 完全独立处理制图数据（只统计大于0的值）
+    df_area_clean = df_area.copy()
+    df_area_clean[attr_key] = pd.to_numeric(df_area_clean[attr_key], errors='coerce')
+    df_area_clean = df_area_clean[(df_area_clean[attr_key] > 0) & (df_area_clean[attr_key].notna())].copy()
+
+    # 添加标题行（第1行）
+    ws.merge_cells('A1:I1')
+    # 标题不显示单位
+    ws['A1'] = f'不同土壤类型{attr_name}统计'
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    # 第2行：土壤类型标题
+    ws.merge_cells('A2:B2')
+    ws['A2'] = '土壤类型'
+    ws['A2'].font = Font(bold=True, size=12)
+    ws['A2'].alignment = Alignment(horizontal='center')
+
+    ws.merge_cells('C2:F2')
+    ws['C2'] = '样点统计'
+    ws['C2'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells('G2:J2')
+    ws['G2'] = '制图统计'
+    ws['G2'].alignment = Alignment(horizontal='center', vertical='center')
+
+    # 第3行：列标题，pH 不显示单位
+    if attr_key == 'ph':
+        headers = ['亚类', '土属', '均值', '中位值', '范围', '数量/个', '均值', '面积/亩', '范围']
+    else:
+        headers = ['亚类', '土属', f'均值/({unit})', f'中位值/({unit})', f'范围/({unit})', '数量/个', f'均值/({unit})', '面积/亩', f'范围/({unit})']
+    
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=3, column=col_idx, value=header)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+
+    # 确保土壤类型字段存在且非空
+    df_sample_clean = df_sample_clean.dropna(subset=['YL', 'TS']).copy()
+    df_area_clean = df_area_clean.dropna(subset=['YL', 'TS']).copy()
+
+    for df in [df_sample_clean, df_area_clean]:
+        df['YL'] = df['YL'].astype(str).str.strip()
+        df['TS'] = df['TS'].astype(str).str.strip()
+
+    if '面积' in df_area_clean.columns:
+        df_area_clean['面积'] = pd.to_numeric(df_area_clean['面积'], errors='coerce')
+
+    all_pairs = pd.concat([
+        df_sample_clean[['YL', 'TS']],
+        df_area_clean[['YL', 'TS']]
+    ]).drop_duplicates().reset_index(drop=True)
+
+    # 定义土壤类型精确排序顺序（亚类→土属列表）
+    soil_type_order_map = {
+        '棕红壤': ['红泥质棕红壤'],
+        '红壤性土': ['砂泥质红壤性土', '麻砂质红壤性土'],
+        '典型黄棕壤': ['暗泥质黄棕壤', '麻砂质黄棕壤', '红砂质黄棕壤', '黄土质黄棕壤', '砂泥质黄棕壤'],
+        '黄棕壤性土': ['砂泥质黄棕壤性土'],
+        '典型棕壤': ['麻砂质典型棕壤'],
+        '白浆化棕壤': ['麻砂质白浆化棕壤', '泥砂质白浆化棕壤'],
+        '潮棕壤': ['泥砂质潮棕壤'],
+        '淋溶褐土': ['黄土质淋溶褐土', '灰泥质淋溶褐土', '暗泥质淋溶褐土'],
+        '潮褐土': ['泥砂质潮褐土'],
+        '红黏土': ['红黏土'],
+        '黑色石灰土': ['黑色石灰土'],
+        '棕色石灰土': ['棕色石灰土'],
+        '暗火山灰土': ['暗火山灰土'],
+        '酸性紫色土': ['壤质酸性紫色土', '黏质酸性紫色土'],
+        '中性紫色土': ['砂质中性紫色土', '壤质中性紫色土', '黏质中性紫色土'],
+        '石灰性紫色土': ['壤质石灰性紫色土'],
+        '酸性粗骨土': ['麻砂质酸性粗骨土', '硅质酸性粗骨土'],
+        '中性粗骨土': ['麻砂质中性粗骨土'],
+        '钙质粗骨土': ['灰泥质钙质粗骨土'],
+        '典型潮土': ['砂质潮土', '壤质潮土', '黏质潮土'],
+        '灰潮土': ['灰潮土', '石灰性灰潮土'],
+        '盐化潮土（含碱化潮土）': ['氯化物盐化潮土', '硫酸盐盐化潮土', '苏打盐化潮土'],
+        '典型砂姜黑土': ['黑腐砂姜黑土（黑姜土）', '覆泥砂姜黑土（覆泥黑姜土）'],
+        '盐化砂姜黑土': ['氯化物盐化砂姜黑土'],
+        '腐泥沼泽土': ['腐泥沼泽土'],
+        '草甸沼泽土': ['草甸沼泽土', '石灰性草甸沼泽土'],
+        '典型滨海盐土': ['氯化物滨海盐土'],
+        '滨海沼泽盐土': ['氯化物沼泽滨海盐土'],
+        '滨海潮滩盐土': ['氯化物潮滩滨海盐土'],
+        '淹育水稻土': ['浅马肝泥田'],
+        '渗育水稻土': ['渗灰泥田', '渗潮泥砂田', '渗潮泥田', '渗湖泥田', '渗涂泥田', '渗淡涂泥田', '渗麻砂泥田', '渗潮白土田', '渗马肝泥田'],
+        '潴育水稻土': ['潮泥田', '湖泥田', '马肝泥田'],
+        '潜育水稻土': ['青湖泥田', '青马肝泥田'],
+        '脱潜水稻土': ['黄斑黏田', '黄斑泥田'],
+        '漂洗水稻土': ['漂潮白土田', '漂马肝泥田'],
+        '盐渍水稻土': ['氯化物潮泥田', '氯化物涂泥田', '氯化物湖泥田', '硫酸盐潮泥田', '硫酸盐涂泥田', '苏打潮泥田', '苏打涂泥田', '苏打湖泥田'],
+        '填充土': ['工矿填充土', '城镇填充土'],
+        '扰动土': ['运移扰动土']
+    }
+    
+    # 亚类顺序
+    sub_order = list(soil_type_order_map.keys())
+    
+    # 创建排序映射
+    sub_to_gens = {}
+    for _, row in all_pairs.iterrows():
+        sub, gen = row['YL'], row['TS']
+        if sub not in sub_to_gens:
+            sub_to_gens[sub] = set()
+        sub_to_gens[sub].add(gen)
+
+    # 按照预定义顺序排序亚类，未在列表中的排到最后
+    def get_soil_order(soil_name):
+        try:
+            return sub_order.index(soil_name)
+        except ValueError:
+            return len(sub_order)  # 未在列表中的排到最后
+    
+    sorted_subs = sorted(sub_to_gens.keys(), key=get_soil_order)
+    
+    # 对每个亚类的土属按预定义顺序排序
+    for sub in sorted_subs:
+        gens_set = sub_to_gens[sub]
+        if sub in soil_type_order_map:
+            # 按预定义顺序排序
+            predefined = soil_type_order_map[sub]
+            sorted_gens = [g for g in predefined if g in gens_set]
+            # 添加未在预定义中的土属（排到最后）
+            sorted_gens.extend(sorted([g for g in gens_set if g not in predefined]))
+            sub_to_gens[sub] = sorted_gens
+        else:
+            # 未定义的亚类按拼音排序
+            sub_to_gens[sub] = sorted(list(gens_set))
+
+    current_row = 4  # 从第4行开始填充数据
+
+    for sub in sorted_subs:
+        gens = sub_to_gens[sub]
+        is_multi = len(gens) > 1
+        
+        # 记录该亚类的起始行
+        start_row_for_sub = current_row
+
+        all_vals_sample = pd.Series([], dtype='float64')
+        all_vals_area = pd.Series([], dtype='float64')
+        all_areas = pd.Series([], dtype='float64')
+
+        for idx, gen in enumerate(gens):
+            mask_s = (df_sample_clean['YL'] == sub) & (df_sample_clean['TS'] == gen)
+            vals = df_sample_clean.loc[mask_s, attr_key]
+            count = len(vals)
+            mean_s = f"{vals.mean():.3f}" if count > 0 else ""
+            median_s = f"{vals.median():.3f}" if count > 0 else ""
+            range_s = f"{vals.min():.3f}～{vals.max():.3f}" if count > 0 else ""
+
+            if count > 0:
+                all_vals_sample = pd.concat([all_vals_sample, vals.astype('float64')], ignore_index=True)
+
+            mask_a = (df_area_clean['YL'] == sub) & (df_area_clean['TS'] == gen)
+            area_df = df_area_clean[mask_a]
+
+            area_sum = 0.0
+            mean_a = ""
+            range_a = ""
+            if not area_df.empty and '面积' in area_df.columns:
+                area_col = area_df['面积']
+                val_col = area_df[attr_key]
+                valid_mask = area_col.notna() & val_col.notna()
+                area_valid = area_col[valid_mask]
+                val_valid = val_col[valid_mask]
+
+                if len(val_valid) > 0:
+                    area_sum = area_valid.sum()
+                    mean_a = f"{val_valid.mean():.3f}"
+                    range_a = f"{val_valid.min():.3f}～{val_valid.max():.3f}"
+
+                    all_vals_area = pd.concat([all_vals_area, val_valid.astype('float64')], ignore_index=True)
+                    all_areas = pd.concat([all_areas, area_valid.astype('float64')], ignore_index=True)
+
+            # 第一个土属显示亚类，其他不显示（留空）
+            if idx == 0:
+                ws.cell(row=current_row, column=1, value=sub)
+            else:
+                ws.cell(row=current_row, column=1, value="")
+            
+            ws.cell(row=current_row, column=2, value=gen)
+            ws.cell(row=current_row, column=3, value=mean_s)
+            ws.cell(row=current_row, column=4, value=median_s)
+            ws.cell(row=current_row, column=5, value=range_s)
+            ws.cell(row=current_row, column=6, value=count)
+            ws.cell(row=current_row, column=7, value=mean_a)
+            ws.cell(row=current_row, column=8, value=format_small_value(area_sum))
+            ws.cell(row=current_row, column=9, value=range_a)
+
+            current_row += 1
+
+        if is_multi:
+            count_all = len(all_vals_sample)
+            mean_s_all = f"{all_vals_sample.mean():.3f}" if len(all_vals_sample) > 0 else ""
+            median_s_all = f"{all_vals_sample.median():.3f}" if len(all_vals_sample) > 0 else ""
+            range_s_all = f"{all_vals_sample.min():.3f}～{all_vals_sample.max():.3f}" if len(all_vals_sample) > 0 else ""
+
+            total_area_all = all_areas.sum()
+            mean_a_all = f"{all_vals_area.mean():.3f}" if len(all_vals_area) > 0 else ""
+            range_a_all = f"{all_vals_area.min():.3f}～{all_vals_area.max():.3f}" if len(all_vals_area) > 0 else ""
+
+            ws.cell(row=current_row, column=1, value="")
+            ws.cell(row=current_row, column=2, value="合计")
+            ws.cell(row=current_row, column=3, value=mean_s_all)
+            ws.cell(row=current_row, column=4, value=median_s_all)
+            ws.cell(row=current_row, column=5, value=range_s_all)
+            ws.cell(row=current_row, column=6, value=count_all)
+            ws.cell(row=current_row, column=7, value=mean_a_all)
+            ws.cell(row=current_row, column=8, value=format_small_value(total_area_all))
+            ws.cell(row=current_row, column=9, value=range_a_all)
+            current_row += 1
+            
+            # 合并亚类单元格（从起始行到合计行）
+            end_row_for_sub = current_row - 1
+            if end_row_for_sub > start_row_for_sub:
+                ws.merge_cells(f'A{start_row_for_sub}:A{end_row_for_sub}')
+                ws.cell(row=start_row_for_sub, column=1).alignment = Alignment(horizontal='center', vertical='center')
+
+    # 使用独立数据源计算“全区”行
+    global_vals_sample = df_sample_clean[attr_key]
+    count_global = len(global_vals_sample)
+    mean_global = f"{global_vals_sample.mean():.3f}" if count_global > 0 else ""
+    median_global = f"{global_vals_sample.median():.3f}" if count_global > 0 else ""
+    range_global = f"{global_vals_sample.min():.3f}～{global_vals_sample.max():.3f}" if count_global > 0 else ""
+
+    area_global = df_area_clean['面积'].sum() if '面积' in df_area_clean.columns else 0
+    vals_area_global = df_area_clean[attr_key]
+    mean_area_global = f"{vals_area_global.mean():.3f}" if len(vals_area_global) > 0 else ""
+    range_area_global = f"{vals_area_global.min():.3f}～{vals_area_global.max():.3f}" if len(vals_area_global) > 0 else ""
+
+    # 合并“全区”行的亚类和土属列
+    ws.merge_cells(f'A{current_row}:B{current_row}')
+    ws.cell(row=current_row, column=1, value="全区")
+    ws.cell(row=current_row, column=1).alignment = Alignment(horizontal='center', vertical='center')
+    ws.cell(row=current_row, column=3, value=mean_global)
+    ws.cell(row=current_row, column=4, value=median_global)
+    ws.cell(row=current_row, column=5, value=range_global)
+    ws.cell(row=current_row, column=6, value=count_global)
+    ws.cell(row=current_row, column=7, value=mean_area_global)
+    ws.cell(row=current_row, column=8, value=format_small_value(area_global))
+    ws.cell(row=current_row, column=9, value=range_area_global)
+
+    thin = Side(border_style="thin")
+    border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    
+    # 记录所有合并的亚类单元格位置
+    merged_cells = []
+    for merge_range in ws.merged_cells.ranges:
+        if merge_range.min_col == 1 and merge_range.max_col == 1:  # A列的合并单元格
+            merged_cells.append((merge_range.min_row, merge_range.max_row))
+    
+    for row in ws.iter_rows(min_row=3, max_row=current_row, min_col=1, max_col=9):
+        for cell in row:
+            cell.border = border
+            # 检查是否是合并单元格的起始行，如果是则保持垂直居中
+            is_merged_start = any(cell.row == start_row and cell.column == 1 for start_row, end_row in merged_cells)
+            if is_merged_start:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            else:
+                cell.alignment = Alignment(horizontal='center')
+
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']:
+        ws.column_dimensions[col].width = 12
+
+
+def read_csv_safe(filepath):
+    with open(filepath, 'rb') as f:
+        raw = f.read(10000)
+        enc = chardet.detect(raw)['encoding']
+        if enc is None:
+            enc = 'utf-8'
+        if enc.lower() in ['gb2312', 'gbk', 'cp936']:
+            enc = 'gbk'
+    try:
+        return pd.read_csv(filepath, encoding=enc)
+    except Exception as e:
+        raise ValueError(f"无法读取 {filepath}（编码: {enc}）: {e}")
+
+
+def process_files(sample_path, area_paths, output_path, progress_callback=None):
+    try:
+        if progress_callback:
+            progress_callback(0, f"正在读取样点数据: {sample_path}")
+        try:
+            df_sample_raw = read_csv_safe(sample_path)
+        except Exception as e:
+            if progress_callback:
+                progress_callback(0, f"ERROR[SampleRead] 样点文件读取失败: {e} 文件: {sample_path}")
+            df_sample_raw = pd.DataFrame(columns=['二级地类','行政区名称','YL','TS'])
+
+        # 读取多个制图统计文件并合并
+        df_area_list = []
+        for idx, area_path in enumerate(area_paths):
+            if progress_callback:
+                progress_callback(5 + idx * 5, f"正在读取制图数据 {idx+1}/{len(area_paths)}: {area_path}")
+            try:
+                df_area = read_csv_safe(area_path)
+                df_area_list.append(df_area)
+            except Exception as e:
+                if progress_callback:
+                    progress_callback(5 + idx * 5, f"ERROR[AreaRead] 制图文件读取失败: {e} 文件: {area_path}，已跳过")
+
+        # 合并所有制图统计数据
+        if progress_callback:
+            progress_callback(15, "正在合并制图数据...")
+        if len(df_area_list) == 0:
+            df_area_raw = pd.DataFrame(columns=['二级地类','行政区名称','YL','TS','面积'])
+        else:
+            df_area_raw = pd.concat(df_area_list, ignore_index=True)
+
+        # 检测所有可分析的属性（原始列 → 标准键）
+        if progress_callback:
+            progress_callback(20, "正在检测属性...")
+        available_attrs = detect_available_attributes(df_sample_raw.columns, set(SOIL_ATTR_CONFIG.keys()))
+        if not available_attrs:
+            return False, "未在样点数据中找到任何支持的土壤属性列！"
+
+        wb = Workbook()
+        # 删除默认的 Sheet
+        wb.remove(wb.active)
+
+        processed_any = False
+        total_attrs = len(available_attrs)
+
+        for attr_idx, (orig_col, attr_key) in enumerate(available_attrs):
+            try:
+                base_progress = 20 + int((attr_idx / total_attrs) * 70)
+                if progress_callback:
+                    progress_callback(base_progress, f"正在处理 {SOIL_ATTR_CONFIG[attr_key]['name']} ({attr_idx+1}/{total_attrs})...")
+                
+                # 尝试标准化列名（确保两表都有该列）
+                try:
+                    df_sample = rename_attr_column_in_df(df_sample_raw.copy(), attr_key)
+                except Exception as e:
+                    raise RuntimeError(f"样点数据缺列或命名不一致: {attr_key} - {e}")
+                try:
+                    df_area = rename_attr_column_in_df(df_area_raw.copy(), attr_key)
+                except Exception as e:
+                    raise RuntimeError(f"制图数据缺列或命名不一致: {attr_key} - {e}")
+                # 若该属性只统计耕园地，则按一级地类过滤（共20项）
+                restricted_keys = {
+                    # 微量元素（6项）
+                    'AFE',    # 有效铁
+                    'AMN',    # 有效锰
+                    'ACU',    # 有效铜
+                    'AZN',    # 有效锌
+                    'AB',     # 有效硼
+                    'AMO',    # 有效钼
+                    # 土壤结构（1项）
+                    'SWXDTJT7',  # 水稳性大团聚体
+                    # 交换性元素（4项）
+                    'ECA',    # 交换性钙
+                    'EMG',    # 交换性镁
+                    'ENA',    # 交换性钠
+                    'EK',     # 交换性钾
+                    # 盐分指标（2项）
+                    'SRXYZL', # 水溶性盐总量
+                    'DDL',    # 电导率
+                    # 钾硫元素（2项）
+                    'SK',     # 缓效钾
+                    'AS1',    # 有效硫
+                    # 重金属（5项，如果配置中存在）
+                    'THG',    # 总汞
+                    'TAS',    # 总砷
+                    'TPB',    # 总铅
+                    'TCD',    # 总镉
+                    'TNI'     # 总镍
+                }
+                if attr_key in restricted_keys:
+                    try:
+                        df_sample = ensure_land_class_column(df_sample)
+                        df_area = ensure_land_class_column(df_area)
+                        df_sample[['一级', '二级']] = df_sample['二级地类'].apply(get_land_class).apply(pd.Series)
+                        df_area[['一级', '二级']] = df_area['二级地类'].apply(get_land_class).apply(pd.Series)
+                        df_sample = df_sample[df_sample['一级'].isin(['耕地','园地'])]
+                        df_area = df_area[df_area['一级'].isin(['耕地','园地'])]
+                    except Exception as e:
+                        raise RuntimeError(f"仅统计耕园地失败（缺少二级地类列或格式错误）: {attr_key} - {e}")
+                # 若属性有特殊用地限制，进一步过滤
+                if attr_key == 'ASI':
+                    try:
+                        df_sample = ensure_land_class_column(df_sample)
+                        df_area = ensure_land_class_column(df_area)
+                        df_sample[['一级','二级']] = df_sample['二级地类'].apply(get_land_class).apply(pd.Series)
+                        df_area[['一级','二级']] = df_area['二级地类'].apply(get_land_class).apply(pd.Series)
+                        df_sample = df_sample[(df_sample['一级']=='耕地') & (df_sample['二级']=='水田')]
+                        df_area = df_area[(df_area['一级']=='耕地') & (df_area['二级']=='水田')]
+                    except Exception as e:
+                        raise RuntimeError(f"仅统计水田失败（缺少二级地类列或格式错误）: {attr_key} - {e}")
+                if attr_key == 'GZCHD':
+                    try:
+                        df_sample = ensure_land_class_column(df_sample)
+                        df_area = ensure_land_class_column(df_area)
+                        df_sample[['一级','二级']] = df_sample['二级地类'].apply(get_land_class).apply(pd.Series)
+                        df_area[['一级','二级']] = df_area['二级地类'].apply(get_land_class).apply(pd.Series)
+                        df_sample = df_sample[df_sample['一级']=='耕地']
+                        df_area = df_area[df_area['一级']=='耕地']
+                    except Exception as e:
+                        raise RuntimeError(f"仅统计耕地失败（缺少二级地类列或格式错误）: {attr_key} - {e}")
+                # 检查是否有有效数值（只统计大于0的值）
+                sample_vals = pd.to_numeric(df_sample[attr_key], errors='coerce')
+                area_vals = pd.to_numeric(df_area[attr_key], errors='coerce')
+                
+                # 只保留大于0的值
+                sample_vals = sample_vals[(sample_vals > 0) & (sample_vals.notna())]
+                area_vals = area_vals[(area_vals > 0) & (area_vals.notna())]
+
+                if len(sample_vals) == 0 and len(area_vals) == 0:
+                    continue
+
+                # 生成四个 sheet
+                ws1 = wb.create_sheet(title=f"{SOIL_ATTR_CONFIG[attr_key]['name']}总体情况")
+                ws2 = wb.create_sheet(title=f"{SOIL_ATTR_CONFIG[attr_key]['name']}不同土地利用类型")
+                ws3 = wb.create_sheet(title=f"{SOIL_ATTR_CONFIG[attr_key]['name']}分乡镇统计")
+                ws4 = wb.create_sheet(title=f"{SOIL_ATTR_CONFIG[attr_key]['name']}分土壤类型")
+
+                generate_overall_summary_to_ws(ws1, df_sample, df_area, attr_key)
+                generate_land_use_summary_to_ws(ws2, df_sample, df_area, attr_key)
+                generate_town_summary_to_ws(ws3, df_sample, df_area, attr_key)
+                generate_soil_type_summary_to_ws(ws4, df_sample, df_area, attr_key)
+
+                processed_any = True
+
+            except Exception as e:
+                import traceback, linecache
+                tb = traceback.extract_tb(e.__traceback__)
+                loc = ''
+                code_line = ''
+                if tb:
+                    last = tb[-1]
+                    loc = f"位置: {last.filename}:{last.lineno} {last.name}()"
+                    code_line = linecache.getline(last.filename, last.lineno).strip()
+                err_type = type(e).__name__
+                if progress_callback:
+                    progress_callback(base_progress, f"ERROR[{err_type}] 处理 {SOIL_ATTR_CONFIG[attr_key]['name']} 失败: {e} {loc} 代码: {code_line}")
+                # 生成零值表格，其他数据正常处理
+                ws1 = wb.create_sheet(title=f"{SOIL_ATTR_CONFIG[attr_key]['name']}总体情况")
+                ws2 = wb.create_sheet(title=f"{SOIL_ATTR_CONFIG[attr_key]['name']}不同土地利用类型")
+                ws3 = wb.create_sheet(title=f"{SOIL_ATTR_CONFIG[attr_key]['name']}分乡镇统计")
+                ws4 = wb.create_sheet(title=f"{SOIL_ATTR_CONFIG[attr_key]['name']}分土壤类型")
+                df_sample_zero = pd.DataFrame({attr_key: [], '二级地类': [], '行政区名称': [], 'YL': [], 'TS': []})
+                df_area_zero = pd.DataFrame({attr_key: [], '二级地类': [], '行政区名称': [], 'YL': [], 'TS': [], '面积': []})
+                try:
+                    generate_overall_summary_to_ws(ws1, df_sample_zero, df_area_zero, attr_key)
+                    generate_land_use_summary_to_ws(ws2, df_sample_zero, df_area_zero, attr_key)
+                    generate_town_summary_to_ws(ws3, df_sample_zero, df_area_zero, attr_key)
+                    generate_soil_type_summary_to_ws(ws4, df_sample_zero, df_area_zero, attr_key)
+                    processed_any = True
+                except Exception as e2:
+                    if progress_callback:
+                        progress_callback(base_progress, f"ERROR[ZeroSheets] {SOIL_ATTR_CONFIG[attr_key]['name']} 生成零值表失败: {e2}")
+                continue
+
+        if not processed_any:
+            return False, "所有检测到的属性均无法处理（缺少数据或格式错误）。"
+
+        if progress_callback:
+            progress_callback(95, "正在保存文件...")
+        wb.save(output_path)
+        
+        if progress_callback:
+            progress_callback(100, "完成！")
+        return True, None
+
+    except Exception as e:
+        import traceback, linecache
+        traceback.print_exc()
+        tb = traceback.extract_tb(e.__traceback__)
+        loc = ''
+        code_line = ''
+        if tb:
+            last = tb[-1]
+            loc = f"位置: {last.filename}:{last.lineno} {last.name}()"
+            code_line = linecache.getline(last.filename, last.lineno).strip()
+        err_type = type(e).__name__
+        if progress_callback:
+            progress_callback(0, f"ERROR[{err_type}] {e} {loc} 代码: {code_line}")
+        return False, f"{err_type}: {e} ({loc}) | 代码: {code_line}"
+
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("土壤属性分级统计工具")
+        self.root.geometry("580x400")
+        self.sample_file = None
+        self.area_files = []
+
+        tk.Label(root, text="土壤属性分级统计工具（支持多制图统计文件）", font=("Arial", 12, "bold")).pack(pady=8)
+        tk.Label(root, text="• 支持所有配置中的土壤属性\n• 文件名自动带时间戳", fg="gray").pack()
+
+        tk.Button(root, text="📁 选择【样点统计.csv】", command=self.select_sample).pack(pady=6)
+        self.label_sample = tk.Label(root, text="未选择", fg="gray")
+        self.label_sample.pack()
+
+        tk.Button(root, text="📁 选择【制图统计.csv】文件（可多选）", command=self.select_area).pack(pady=6)
+        self.label_area = tk.Label(root, text="未选择", fg="gray")
+        self.label_area.pack()
+
+        tk.Button(root, text="✅ 生成统计表", command=self.run_process, bg="#4CAF50", fg="white",
+                  font=("Arial", 12)).pack(pady=15)
+
+        # 添加一个文本框显示已选择的制图统计文件
+        self.area_listbox_frame = tk.Frame(root)
+        self.area_listbox_frame.pack(pady=5, fill=tk.X, padx=20)
+        self.area_listbox_label = tk.Label(self.area_listbox_frame, text="已选择的制图统计文件：")
+        self.area_listbox_label.pack(anchor=tk.W)
+        self.area_listbox = tk.Listbox(self.area_listbox_frame, height=3)
+        self.area_listbox.pack(fill=tk.X, pady=2)
+        self.scrollbar = tk.Scrollbar(self.area_listbox_frame, orient=tk.VERTICAL, command=self.area_listbox.yview)
+        self.area_listbox.config(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 进度条和状态标签
+        self.progress_frame = tk.Frame(root)
+        self.progress_frame.pack(pady=10, fill=tk.X, padx=20)
+        self.progress_label = tk.Label(self.progress_frame, text="", fg="blue")
+        self.progress_label.pack()
+        self.progress_bar = ttk.Progressbar(self.progress_frame, length=500, mode='determinate')
+        self.progress_bar.pack()
+        # 日志面板
+        self.log_frame = tk.Frame(root)
+        self.log_frame.pack(pady=6, fill=tk.BOTH, expand=True, padx=20)
+        tk.Label(self.log_frame, text="处理日志").pack(anchor=tk.W)
+        self.log_text = scrolledtext.ScrolledText(self.log_frame, height=8, state='disabled')
+        self.log_text.pack(fill=tk.BOTH, expand=True)
+
+    def select_sample(self):
+        f = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if f:
+            self.sample_file = f
+            self.label_sample.config(text=f.split("/")[-1], fg="black")
+            self.append_log('INFO', f"选择样点文件: {self.sample_file}")
+
+    def select_area(self):
+        files = filedialog.askopenfilenames(filetypes=[("CSV files", "*.csv")])
+        if files:
+            self.area_files = list(files)
+            self.label_area.config(text=f"已选择 {len(self.area_files)} 个文件", fg="black")
+            # 清空列表框
+            self.area_listbox.delete(0, tk.END)
+            # 添加文件名到列表框
+            for file_path in self.area_files:
+                self.area_listbox.insert(tk.END, file_path.split("/")[-1])
+            self.append_log('INFO', f"选择制图文件 {len(self.area_files)} 个")
+            for file_path in self.area_files:
+                self.append_log('INFO', f"制图文件: {file_path}")
+
+    def update_progress(self, value, message):
+        self.progress_bar['value'] = value
+        self.progress_label.config(text=message)
+        self.append_log('ERROR' if str(message).upper().startswith('ERROR') else 'INFO', str(message))
+        self.root.update_idletasks()
+    
+    def append_log(self, level, message):
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        line = f"[{ts}] {level} - {message}\n"
+        self.log_text.configure(state='normal')
+        self.log_text.insert(tk.END, line)
+        self.log_text.see(tk.END)
+        self.log_text.configure(state='disabled')
+        # 同步输出到终端
+        print(line.strip())
+    
+    def run_process(self):
+        if not self.sample_file:
+            messagebox.showwarning("⚠️ 提示", "请先选择样点统计CSV文件！")
+            return
+        if not self.area_files:
+            messagebox.showwarning("⚠️ 提示", "请至少选择一个制图统计CSV文件！")
+            return
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output = f"土壤属性分级统计_{timestamp}.xlsx"
+        
+        # 重置进度条
+        self.progress_bar['value'] = 0
+        self.progress_label.config(text="准备开始...")
+        self.root.update_idletasks()
+
+        self.append_log('INFO', f"开始处理，输出文件: {output}")
+        success, msg = process_files(self.sample_file, self.area_files, output, self.update_progress)
+        if success:
+            self.append_log('INFO', f"处理完成，文件已生成: {output}")
+            messagebox.showinfo("🎉 成功", f"文件已生成：\n{output}")
+        else:
+            self.append_log('ERROR', f"处理失败：{msg}")
+            messagebox.showerror("❌ 错误", f"处理失败：\n{msg}")
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()
+
+
+

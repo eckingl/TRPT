@@ -6,7 +6,12 @@ import { ref, computed } from 'vue'
 import { getConfig, saveConfig as apiSaveConfig } from '@/api'
 
 export const useProjectStore = defineStore('project', () => {
-  // 状态
+  // ============ 选择状态（跨页面保持）============
+  const selectedCategory = ref(null)
+  const selectedTopic = ref(null)
+  const selectedRegion = ref(null)
+
+  // ============ 项目配置 ============
   const config = ref({
     region_name: '',
     survey_year: new Date().getFullYear(),
@@ -14,21 +19,43 @@ export const useProjectStore = defineStore('project', () => {
     grading_standards: {}
   })
 
+  // ============ 数据状态 ============
   const uploadedFile = ref(null)
   const dataPreview = ref([])
   const columns = ref([])
   const isLoading = ref(false)
 
-  // 计算属性
+  // ============ 计算属性 ============
   const hasData = computed(() => uploadedFile.value !== null)
   const isConfigured = computed(() => config.value.region_name !== '')
+  const hasSelection = computed(() =>
+    selectedCategory.value && selectedTopic.value && selectedRegion.value
+  )
 
-  // 方法
+  // ============ 选择方法 ============
+  const setSelection = (category, topic, region) => {
+    selectedCategory.value = category
+    selectedTopic.value = topic
+    selectedRegion.value = region
+    // 同步到 config
+    if (region) {
+      config.value.regionId = region.id
+      config.value.regionName = region.name
+    }
+  }
+
+  const clearSelection = () => {
+    selectedCategory.value = null
+    selectedTopic.value = null
+    selectedRegion.value = null
+  }
+
+  // ============ 配置方法 ============
   const loadConfig = async () => {
     isLoading.value = true
     try {
       const data = await getConfig()
-      config.value = data
+      config.value = { ...config.value, ...data }
     } catch (error) {
       console.error('加载配置失败:', error)
       throw error
@@ -41,7 +68,7 @@ export const useProjectStore = defineStore('project', () => {
     isLoading.value = true
     try {
       const data = await apiSaveConfig(config.value)
-      config.value = data
+      config.value = { ...config.value, ...data }
     } catch (error) {
       console.error('保存配置失败:', error)
       throw error
@@ -50,6 +77,7 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
+  // ============ 数据方法 ============
   const setUploadedFile = (file, preview, cols) => {
     uploadedFile.value = file
     dataPreview.value = preview
@@ -63,7 +91,11 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   return {
-    // 状态
+    // 选择状态
+    selectedCategory,
+    selectedTopic,
+    selectedRegion,
+    // 配置状态
     config,
     uploadedFile,
     dataPreview,
@@ -72,9 +104,14 @@ export const useProjectStore = defineStore('project', () => {
     // 计算属性
     hasData,
     isConfigured,
-    // 方法
+    hasSelection,
+    // 选择方法
+    setSelection,
+    clearSelection,
+    // 配置方法
     loadConfig,
     saveConfig,
+    // 数据方法
     setUploadedFile,
     clearUploadedFile
   }

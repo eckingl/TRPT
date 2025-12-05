@@ -28,6 +28,9 @@ class Database:
                     category TEXT NOT NULL,
                     topic TEXT NOT NULL,
                     item TEXT NOT NULL,
+                    province TEXT,
+                    city TEXT,
+                    county TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     UNIQUE(name, category, topic, item)
@@ -67,6 +70,9 @@ class Database:
         category: str,
         topic: str,
         item: str,
+        province: Optional[str] = None,
+        city: Optional[str] = None,
+        county: Optional[str] = None,
     ) -> int:
         """创建新地区项目
 
@@ -75,6 +81,9 @@ class Database:
             category: 大类
             topic: 专题
             item: 具体项目
+            province: 省份代码
+            city: 市代码
+            county: 县/区名称
 
         Returns:
             新创建的地区ID
@@ -83,10 +92,10 @@ class Database:
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(
                 """
-                INSERT INTO regions (name, category, topic, item, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO regions (name, category, topic, item, province, city, county, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, category, topic, item, now, now),
+                (name, category, topic, item, province, city, county, now, now),
             )
             await db.commit()
             return cursor.lastrowid or 0

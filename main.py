@@ -70,7 +70,7 @@ def start_server() -> None:
 def main() -> None:
     """主入口"""
     print("=" * 50)
-    print("  农业土壤普查报告生成系统")
+    print("  农业数据处理系统")
     print("=" * 50)
 
     if not check_dependencies():

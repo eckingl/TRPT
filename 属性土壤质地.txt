@@ -1,0 +1,677 @@
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import chardet
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from pypinyin import lazy_pinyin  # 导入拼音库
+import openpyxl
+import openpyxl.styles
+
+
+# ========== 工具函数 ==========
+def get_pinyin_first_letter(text):
+    """获取文本的拼音首字母（用于排序）"""
+    pinyin_list = lazy_pinyin(str(text))
+    return ''.join(pinyin_list).lower()
+
+
+def read_csv_safe(filepath):
+    with open(filepath, 'rb') as f:
+        raw = f.read(10000)
+        enc = chardet.detect(raw)['encoding']
+        if enc is None:
+            enc = 'utf-8'
+        if enc.lower() in ['gb2312', 'gbk', 'cp936']:
+            enc = 'gbk'
+    return pd.read_csv(filepath, encoding=enc)
+
+
+def find_trzd_column(df):
+    for col in df.columns:
+        if col.strip().lower() == 'trzd':
+            return col
+    raise ValueError("未找到名为 'TRZD' 的列（不区分大小写）")
+
+
+# ========== TRZD 映射配置（支持中文输入）==========
+TRZD_NAME_TO_INFO = {
+    "砂土及壤质砂土": ("砂土类", "砂土及壤质砂土", 1),
+    "砂质壤土": ("砂壤类", "砂质壤土", 2),
+    "粉(砂)质壤土": ("轻壤类", "粉(砂)质壤土", 3),
+    "壤土": ("中壤类", "壤土", 4),
+    "砂质黏壤土": ("黏壤类", "砂质黏壤土", 5),
+    "黏壤土": ("黏壤类", "黏壤土", 5),
+    "粉(砂)质黏壤土": ("黏壤类", "粉(砂)质黏壤土", 5),
+    "砂质黏土": ("轻黏类", "砂质黏土", 6),
+    "壤质黏土": ("轻黏类", "壤质黏土", 6),
+    "粉(砂)质黏土": ("轻黏类", "粉(砂)质黏土", 6),
+    "黏土": ("黏土类", "黏土", 7),
+    "重黏土": ("黏土类", "重黏土", 7),
+}
+
+# 动态生成 GRADE_GROUPS，避免冗余
+from collections import defaultdict
+GRADE_GROUPS = defaultdict(list)
+for name, (_, _, grade) in TRZD_NAME_TO_INFO.items():
+    if grade in [5, 6, 7]:
+        GRADE_GROUPS[grade].append(name)
+GRADE_GROUPS = dict(GRADE_GROUPS)
+
+# 定义质地结构，用于构建列（移除合计列）
+TEXTURE_STRUCTURE = [
+    ["砂土及壤质砂土", "砂质壤土", "粉(砂)质壤土", "壤土"],
+    ["砂质黏壤土", "黏壤土", "粉(砂)质黏壤土"],
+    ["砂质黏土", "壤质黏土", "粉(砂)质黏土"],
+    ["黏土", "重黏土"]
+]
+
+# 重建 TEXTURE_COLS（所有质地类型，不包含合计列）
+TEXTURE_COLS = (
+    TEXTURE_STRUCTURE[0] +
+    TEXTURE_STRUCTURE[1] +
+    TEXTURE_STRUCTURE[2] +
+    TEXTURE_STRUCTURE[3]
+)
+
+
+def map_trzd_to_info(trzd_val):
+    """将 TRZD 值映射为 (类别, 名称, 分级)，无效值返回 (None, None, None)"""
+    if pd.isna(trzd_val):
+        return None, None, None
+    trzd_str = str(trzd_val).strip()
+    if trzd_str in ["0", "/", ""]:
+        return None, None, None
+    if trzd_str in TRZD_NAME_TO_INFO:
+        return TRZD_NAME_TO_INFO[trzd_str]
+    else:
+        return "其他", f"未知({trzd_str})", 99
+
+
+# ========== 表头定义 ==========
+# 表2表头（土地利用类型）
+HEADER_TOP_2 = (
+    ["土地利用类型"] * 2 + ["面积/亩", "样点/个"] +
+    ["样点统计%"] * len(TEXTURE_COLS) + ["制图统计%"] * len(TEXTURE_COLS)
+)
+HEADER_BOT_2 = (
+    ["一级", "二级", "面积/亩", "样点/个"] + TEXTURE_COLS + TEXTURE_COLS
+)
+
+# 表3表头（土壤类型）
+HEADER_TOP_3 = (
+    ["土壤类型"] * 2 + ["面积/亩", "样点/个"] +
+    ["样点统计%"] * len(TEXTURE_COLS) + ["制图统计%"] * len(TEXTURE_COLS)
+)
+HEADER_BOT_3 = (
+    ["亚类", "土属", "面积/亩", "样点/个"] + TEXTURE_COLS + TEXTURE_COLS
+)
+
+HEADER_TOP_4 = (
+    ["乡镇", "面积/亩", "样点/个"] +
+    ["样点统计%"] * len(TEXTURE_COLS) + ["制图统计%"] * len(TEXTURE_COLS)
+)
+HEADER_BOT_4 = (
+    ["乡镇", "面积/亩", "样点/个"] + TEXTURE_COLS + TEXTURE_COLS
+)
+
+
+# ========== 构建质地行数据（移除合计列版本）==========
+def build_texture_row(sample_df, area_df, total_sample_count, total_area_sum):
+    texture_names = TEXTURE_COLS  # 已经不包含"合计"了
+
+    # 初始化字典
+    texture_counts = {name: 0 for name in texture_names}
+    texture_areas = {name: 0.0 for name in texture_names}
+
+    if not sample_df.empty:
+        counts_series = sample_df['质地名称'].value_counts()
+        for name in texture_names:
+            texture_counts[name] = counts_series.get(name, 0)
+
+    if not area_df.empty:
+        area_grouped = area_df.groupby('质地名称')['面积'].sum()
+        for name in texture_names:
+            texture_areas[name] = area_grouped.get(name, 0.0)
+
+    sample_pcts = {}
+    area_pcts = {}
+    for name in texture_names:
+        sample_pcts[name] = round(texture_counts[name] / total_sample_count * 100, 3) if total_sample_count > 0 else 0.0
+        area_pcts[name] = round(texture_areas[name] / total_area_sum * 100, 3) if total_area_sum > 0 else 0.0
+
+    # 按顺序构建列表（不再添加合计列）
+    sample_pct_list = []
+    area_pct_list = []
+
+    for name in TEXTURE_COLS:
+        sample_pct_list.append(sample_pcts.get(name, 0.0))
+        area_pct_list.append(area_pcts.get(name, 0.0))
+
+    return sample_pct_list + area_pct_list
+
+
+# ========== 主处理函数 ==========
+def process_trzd_files(sample_path, area_paths, output_path):
+    try:
+        # 读取样点文件（单个）
+        df_sample = read_csv_safe(sample_path)
+
+        # 读取并合并多个制图文件
+        df_area_list = []
+        for path in area_paths:
+            df_temp = read_csv_safe(path)
+            df_area_list.append(df_temp)
+        df_area = pd.concat(df_area_list, ignore_index=True)
+
+        trzd_col_s = find_trzd_column(df_sample)
+        trzd_col_a = find_trzd_column(df_area)
+
+        df_sample = df_sample.rename(columns={trzd_col_s: 'TRZD'})
+        df_area = df_area.rename(columns={trzd_col_a: 'TRZD'})
+
+        # 检测并统一列名（支持DLMC和二级地类）
+        if '二级地类' in df_sample.columns:
+            pass  # 已经是二级地类
+        elif 'DLMC' in df_sample.columns:
+            df_sample = df_sample.rename(columns={'DLMC': '二级地类'})
+        else:
+            raise ValueError("样点文件缺少'二级地类'或'DLMC'列")
+        
+        if '二级地类' in df_area.columns:
+            pass  # 已经是二级地类
+        elif 'DLMC' in df_area.columns:
+            df_area = df_area.rename(columns={'DLMC': '二级地类'})
+        else:
+            raise ValueError("制图文件缺少'二级地类'或'DLMC'列")
+        
+        # 检测并统一YL和TS列名（支持SSub_JZg/YL和SGen_JZg/TS）
+        if 'YL' in df_sample.columns:
+            pass
+        elif 'SSub_JZg' in df_sample.columns:
+            df_sample = df_sample.rename(columns={'SSub_JZg': 'YL'})
+        else:
+            raise ValueError("样点文件缺少'YL'或'SSub_JZg'列")
+        
+        if 'TS' in df_sample.columns:
+            pass
+        elif 'SGen_JZg' in df_sample.columns:
+            df_sample = df_sample.rename(columns={'SGen_JZg': 'TS'})
+        else:
+            raise ValueError("样点文件缺少'TS'或'SGen_JZg'列")
+        
+        if 'YL' in df_area.columns:
+            pass
+        elif 'SSub_JZg' in df_area.columns:
+            df_area = df_area.rename(columns={'SSub_JZg': 'YL'})
+        else:
+            raise ValueError("制图文件缺少'YL'或'SSub_JZg'列")
+        
+        if 'TS' in df_area.columns:
+            pass
+        elif 'SGen_JZg' in df_area.columns:
+            df_area = df_area.rename(columns={'SGen_JZg': 'TS'})
+        else:
+            raise ValueError("制图文件缺少'TS'或'SGen_JZg'列")
+        
+        required_cols_sample = ['TRZD', '二级地类', '行政区名称', 'YL', 'TS']
+        required_cols_area = ['TRZD', '二级地类', '行政区名称', 'YL', 'TS', '面积']
+
+        for col in required_cols_sample:
+            if col not in df_sample.columns:
+                raise ValueError(f"样点文件缺少列: {col}")
+        for col in required_cols_area:
+            if col not in df_area.columns:
+                raise ValueError(f"制图文件缺少列: {col}")
+
+        # 批量映射 TRZD
+        def safe_map(x):
+            if pd.isna(x) or str(x).strip() in {"0", "/", ""}:
+                return (None, None, None)
+            s = str(x).strip()
+            return TRZD_NAME_TO_INFO.get(s, ("其他", f"未知({s})", 99))
+
+        mapped_sample = df_sample['TRZD'].apply(safe_map)
+        df_sample[['质地类别', '质地名称', '分级']] = pd.DataFrame(mapped_sample.tolist(), index=df_sample.index)
+
+        mapped_area = df_area['TRZD'].apply(safe_map)
+        df_area[['质地类别', '质地名称', '分级']] = pd.DataFrame(mapped_area.tolist(), index=df_area.index)
+
+        # 删除无效行
+        df_sample = df_sample.dropna(subset=['质地类别']).copy()
+        df_area = df_area.dropna(subset=['质地类别']).copy()
+
+        # 确保面积为数值
+        df_area['面积'] = pd.to_numeric(df_area['面积'], errors='coerce')
+        df_area = df_area.dropna(subset=['面积']).copy()
+
+        total_sample_all = len(df_sample)
+        total_area_all = df_area['面积'].sum()
+
+        # ========== 表1：总体状况 ==========
+        # 数字转罗马数字映射
+        grade_to_roman = {1: 'Ⅰ', 2: 'Ⅱ', 3: 'Ⅲ', 4: 'Ⅳ', 5: 'Ⅴ', 6: 'Ⅵ', 7: 'Ⅶ'}
+        
+        data1 = []
+        VALID_GRADES = sorted(set(info[2] for info in TRZD_NAME_TO_INFO.values()))
+        for grade in VALID_GRADES:
+            names_in_grade = [n for n, (_, _, g) in TRZD_NAME_TO_INFO.items() if g == grade]
+            cat_name = TRZD_NAME_TO_INFO[names_in_grade[0]][0]  # 类别名取第一个
+            roman_grade = grade_to_roman.get(grade, str(grade))  # 转为罗马数字
+            
+            for name in names_in_grade:
+                count = len(df_sample[df_sample['质地名称'] == name])
+                freq = round(count / total_sample_all * 100, 3) if total_sample_all > 0 else 0.0
+                area_sum = df_area.loc[df_area['质地名称'] == name, '面积'].sum()
+                area_pct = round(area_sum / total_area_all * 100, 3) if total_area_all > 0 else 0.0
+                data1.append([roman_grade, cat_name, name, count, freq, round(area_sum, 3), area_pct])
+
+            # 添加合计（仅对 5,6,7）
+            if grade in [5, 6, 7]:
+                subset_s = df_sample[df_sample['质地名称'].isin(names_in_grade)]
+                subset_a = df_area[df_area['质地名称'].isin(names_in_grade)]
+                count = len(subset_s)
+                freq = round(count / total_sample_all * 100, 3) if total_sample_all > 0 else 0.0
+                area_sum = subset_a['面积'].sum()
+                area_pct = round(area_sum / total_area_all * 100, 3) if total_area_all > 0 else 0.0
+                data1.append([roman_grade, cat_name, "合计", count, freq, round(area_sum, 3), area_pct])
+
+        data1.append(["全市", "全市", "全市", total_sample_all, 100.0, round(total_area_all, 3), 100.0])
+
+        df1 = pd.DataFrame(data1, columns=pd.MultiIndex.from_arrays([
+            ["土壤三普分级"] * 3 + ["样点统计"] * 2 + ["制图统计"] * 2,
+            ["分级", "质地类别", "质地名称", "频数/个", "频率/%", "面积/亩", "比例/%"]
+        ]))
+
+        # ========== 表2：土地利用类型 ==========
+        def get_land_class(dlmc):
+            if pd.isna(dlmc):
+                return (None, None)
+            s = str(dlmc).strip()
+            if s in ["水田", "水浇地", "旱地"]:
+                return ("耕地", s)
+            elif s in ["果园", "茶园"]:
+                return ("园地", s)
+            elif "园地" in s:
+                return ("园地", "其他园地")
+            elif "林地" in s:
+                return ("林地", "林地")
+            elif "草地" in s:
+                return ("草地", "草地")
+            else:
+                return ("其他", "其他")
+
+        df_sample[['一级', '二级']] = pd.DataFrame(
+            df_sample['二级地类'].apply(get_land_class).tolist(),
+            index=df_sample.index
+        )
+        df_area[['一级', '二级']] = pd.DataFrame(
+            df_area['二级地类'].apply(get_land_class).tolist(),
+            index=df_area.index
+        )
+
+        land_config = {
+            "耕地": ["水田", "水浇地", "旱地"],
+            "园地": ["果园", "茶园", "其他园地"],
+            "林地": ["林地"],
+            "草地": ["草地"],
+            "其他": ["其他"]
+        }
+
+        data2 = []
+        for primary, secondaries in land_config.items():
+            for sec in secondaries:
+                if primary in ["林地", "草地"]:
+                    sample_sec = df_sample[df_sample['一级'] == primary]
+                    area_sec = df_area[df_area['一级'] == primary]
+                else:
+                    sample_sec = df_sample[(df_sample['一级'] == primary) & (df_sample['二级'] == sec)]
+                    area_sec = df_area[(df_area['一级'] == primary) & (df_area['二级'] == sec)]
+
+                total_in_sec = len(sample_sec)
+                total_area_sec = area_sec['面积'].sum()
+
+                base_info = [primary, sec, round(total_area_sec, 3), total_in_sec]
+                texture_data = build_texture_row(sample_sec, area_sec, total_in_sec, total_area_sec)
+                data2.append(base_info + texture_data)
+
+            if primary in ["耕地", "园地"]:
+                sample_total = df_sample[df_sample['一级'] == primary]
+                area_total = df_area[df_area['一级'] == primary]
+                total_count_p = len(sample_total)
+                total_area_p = area_total['面积'].sum()
+
+                base_info = ["", "合计", round(total_area_p, 3), total_count_p]
+                texture_data = build_texture_row(sample_total, area_total, total_count_p, total_area_p)
+                data2.append(base_info + texture_data)
+
+        city_base = ["全市", "全市", round(total_area_all, 3), total_sample_all]
+        city_texture = build_texture_row(df_sample, df_area, total_sample_all, total_area_all)
+        data2.append(city_base + city_texture)
+
+        df2 = pd.DataFrame(data2, columns=pd.MultiIndex.from_arrays([HEADER_TOP_2, HEADER_BOT_2]))
+        
+        # 记录需要合并的行信息（一级分类）
+        merge_info_land = []  # [(start_row, end_row, primary_name), ...]
+
+        # 记录土地利用类型的一级分类合并信息
+        current_row_idx = 0
+        for primary, secondaries in land_config.items():
+            start_row = current_row_idx
+            current_row_idx += len(secondaries)
+            if primary in ["耕地", "园地"]:
+                current_row_idx += 1  # 合计行
+            end_row = current_row_idx - 1
+            merge_info_land.append((start_row, end_row, primary))
+        
+        # ========== 表3：不同土壤类型 ==========
+        # 收集所有亚类和土属（不排序，后续统一按预定义顺序排序）
+        sub_to_gens = df_sample.groupby('YL')['TS'].apply(
+            lambda x: list(x.dropna().unique())
+        ).to_dict()
+
+        sub_to_gens_area = df_area.groupby('YL')['TS'].apply(
+            lambda x: list(x.dropna().unique())
+        ).to_dict()
+
+        all_sub_gens = {}
+        all_subs = set(sub_to_gens.keys()) | set(sub_to_gens_area.keys())
+        for sub in all_subs:
+            gens_s = set(sub_to_gens.get(sub, []))
+            gens_a = set(sub_to_gens_area.get(sub, []))
+            all_sub_gens[sub] = list(gens_s | gens_a)  # 转为列表，不排序
+        
+        # 土壤类型排序映射表（基于实际数据更新）
+        soil_type_order_map = {
+            '棕红壤': ['红泥质棕红壤'],
+            '红壤性土': ['砂泥质红壤性土', '麻砂质红壤性土'],
+            '典型黄棕壤': ['暗泥质黄棕壤', '麻砂质黄棕壤', '红砂质黄棕壤', '黄土质黄棕壤', '砂泥质黄棕壤'],
+            '黄棕壤性土': ['砂泥质黄棕壤性土'],
+            '典型棕壤': ['麻砂质典型棕壤'],
+            '白浆化棕壤': ['麻砂质白浆化棕壤', '泥砂质白浆化棕壤'],
+            '潮棕壤': ['泥砂质潮棕壤'],
+            '淋溶褐土': ['黄土质淋溶褐土', '灰泥质淋溶褐土', '暗泥质淋溶褐土'],
+            '潮褐土': ['泥砂质潮褐土'],
+            '红黏土': ['红黏土'],
+            '黑色石灰土': ['黑色石灰土'],
+            '棕色石灰土': ['棕色石灰土'],
+            '暗火山灰土': ['暗火山灰土'],
+            '酸性紫色土': ['壤质酸性紫色土', '黏质酸性紫色土'],
+            '中性紫色土': ['砂质中性紫色土', '壤质中性紫色土', '黏质中性紫色土'],
+            '石灰性紫色土': ['壤质石灰性紫色土'],
+            '酸性粗骨土': ['麻砂质酸性粗骨土', '硅质酸性粗骨土'],
+            '中性粗骨土': ['麻砂质中性粗骨土'],
+            '钙质粗骨土': ['灰泥质钙质粗骨土'],
+            '典型潮土': ['砂质潮土', '壤质潮土', '黏质潮土'],
+            '灰潮土': ['灰潮土', '石灰性灰潮土'],
+            '盐化潮土（含碱化潮土）': ['氯化物盐化潮土', '硫酸盐盐化潮土', '苏打盐化潮土'],
+            '典型砂姜黑土': ['黑腐砂姜黑土（黑姜土）', '覆泥砂姜黑土（覆泥黑姜土）'],
+            '盐化砂姜黑土': ['氯化物盐化砂姜黑土'],
+            '腐泥沼泽土': ['腐泥沼泽土'],
+            '草甸沼泽土': ['草甸沼泽土', '石灰性草甸沼泽土'],
+            '典型滨海盐土': ['氯化物滨海盐土'],
+            '滨海沼泽盐土': ['氯化物沼泽滨海盐土'],
+            '滨海潮滩盐土': ['氯化物潮滩滨海盐土'],
+            '淹育水稻土': ['浅马肝泥田'],
+            '渗育水稻土': ['渗灰泥田', '渗潮泥砂田', '渗潮泥田', '渗湖泥田', '渗涂泥田', '渗淡涂泥田', '渗麻砂泥田', '渗潮白土田', '渗马肝泥田'],
+            '潴育水稻土': ['潮泥田', '湖泥田', '马肝泥田'],
+            '潜育水稻土': ['青湖泥田', '青马肝泥田'],
+            '脱潜水稻土': ['黄斑黏田', '黄斑泥田'],
+            '漂洗水稻土': ['漂潮白土田', '漂马肝泥田'],
+            '盐渍水稻土': ['氯化物潮泥田', '氯化物涂泥田', '氯化物湖泥田', '硫酸盐潮泥田', '硫酸盐涂泥田', '苏打潮泥田', '苏打涂泥田', '苏打湖泥田'],
+            '填充土': ['工矿填充土', '城镇填充土'],
+            '扰动土': ['运移扰动土']
+        }
+        
+        # 生成亚类排序列表（按映射表顺序）
+        sub_order = list(soil_type_order_map.keys())
+        
+        def get_soil_order(soil_name):
+            """获取土壤类型的排序索引"""
+            try:
+                return sub_order.index(soil_name)
+            except ValueError:
+                return len(sub_order)  # 未在列表中的排到最后
+        
+        # 按土壤类型排序亚类（先按预定义顺序）
+        sorted_subs = sorted(all_sub_gens.keys(), key=get_soil_order)
+        
+        # 对每个亚类下的土属按预定义顺序排序
+        sorted_all_sub_gens = {}
+        for sub in sorted_subs:
+            gen_list = all_sub_gens[sub]
+            if sub in soil_type_order_map:
+                # 使用预定义顺序排序
+                predefined_order = soil_type_order_map[sub]
+                def get_gen_order(gen_name):
+                    try:
+                        return predefined_order.index(gen_name)
+                    except ValueError:
+                        return len(predefined_order)  # 未在列表中的排到最后
+                sorted_all_sub_gens[sub] = sorted(gen_list, key=get_gen_order)
+            else:
+                # 没有预定义顺序的，按字符串排序
+                sorted_all_sub_gens[sub] = sorted(gen_list)
+        
+        # 重新构建有序字典（保持亚类顺序）
+        all_sub_gens = {sub: sorted_all_sub_gens[sub] for sub in sorted_subs}
+
+        data3 = []
+        # 按排序后的亚类顺序遍历（确保顺序正确）
+        for sub in sorted_subs:
+            gens = all_sub_gens[sub]
+            for gen in gens:
+                sample_soil = df_sample[(df_sample['YL'] == sub) & (df_sample['TS'] == gen)]
+                area_soil = df_area[(df_area['YL'] == sub) & (df_area['TS'] == gen)]
+
+                total_count = len(sample_soil)
+                total_area_val = area_soil['面积'].sum()
+
+                base_info = [sub, gen, round(total_area_val, 3), total_count]
+                texture_data = build_texture_row(sample_soil, area_soil, total_count, total_area_val)
+                data3.append(base_info + texture_data)
+
+            if len(gens) >= 2:
+                sample_sub = df_sample[df_sample['YL'] == sub]
+                area_sub = df_area[df_area['YL'] == sub]
+                total_count_sub = len(sample_sub)
+                total_area_sub = area_sub['面积'].sum()
+                base_info_sub = [sub, "合计", round(total_area_sub, 3), total_count_sub]
+                texture_data_sub = build_texture_row(sample_sub, area_sub, total_count_sub, total_area_sub)
+                data3.append(base_info_sub + texture_data_sub)
+
+        city_base = ["全市", "全市", round(total_area_all, 3), total_sample_all]
+        data3.append(city_base + city_texture)
+
+        df3 = pd.DataFrame(data3, columns=pd.MultiIndex.from_arrays([HEADER_TOP_3, HEADER_BOT_3]))
+        
+        # 记录土壤类型的亚类合并信息
+        merge_info_soil = []  # [(start_row, end_row, sub_name), ...]
+        current_row_idx_soil = 0
+        # 按排序后的亚类顺序遍历（与data3保持一致）
+        for sub in sorted_subs:
+            gens = all_sub_gens[sub]
+            start_row = current_row_idx_soil
+            current_row_idx_soil += len(gens)
+            if len(gens) >= 2:
+                current_row_idx_soil += 1  # 合计行
+            end_row = current_row_idx_soil - 1
+            merge_info_soil.append((start_row, end_row, sub))
+
+        # ========== 表4：各乡镇 ==========
+        towns = sorted(set(df_sample['行政区名称'].dropna()) | set(df_area['行政区名称'].dropna()), key=get_pinyin_first_letter)
+        data4 = []
+
+        for town in towns:
+            s_town = df_sample[df_sample['行政区名称'] == town]
+            a_town = df_area[df_area['行政区名称'] == town]
+
+            total_count = len(s_town)
+            total_area_val = a_town['面积'].sum()
+
+            base_info = [town, round(total_area_val, 3), total_count]
+            texture_data = build_texture_row(s_town, a_town, total_count, total_area_val)
+            data4.append(base_info + texture_data)
+
+        city_base_town = ["全市", round(total_area_all, 3), total_sample_all]
+        data4.append(city_base_town + city_texture)
+        df4 = pd.DataFrame(data4, columns=pd.MultiIndex.from_arrays([HEADER_TOP_4, HEADER_BOT_4]))
+
+        # ========== 导出 ==========
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = f"土壤质地统计_{timestamp}.xlsx"
+
+        with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+            df1.to_excel(writer, sheet_name="总体状况-土壤质地分类", index=True, startrow=0)
+            df2.to_excel(writer, sheet_name="不同土地利用类型土壤质地", index=True, startrow=0)
+            df3.to_excel(writer, sheet_name="不同土壤类型土壤质地", index=True, startrow=0)
+            df4.to_excel(writer, sheet_name="各乡镇土壤质地", index=True, startrow=0)
+
+            wb = writer.book
+            
+            # ========== 删除第3行空行 ==========
+            for sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+                # 删除第3行（pandas多级表头导致的空行）
+                ws.delete_rows(3, 1)
+            
+            # ========== 处理表1：合并质地类别单元格 ==========
+            ws1 = wb["总体状况-土壤质地分类"]
+            # 找到质地类别列（第C列）
+            cat_col_letter = 'C'
+            row_start = 3  # 删除空行后，数据从第3行开始
+            
+            # 按质地类别分组合并
+            current_cat = None
+            cat_start_row = None
+            for row_idx in range(row_start, row_start + len(data1) + 1):
+                if row_idx < row_start + len(data1):
+                    cell_value = ws1[f'{cat_col_letter}{row_idx}'].value
+                    if cell_value != current_cat:
+                        # 合并上一个类别
+                        if current_cat is not None and cat_start_row is not None and row_idx > cat_start_row:
+                            ws1.merge_cells(f'{cat_col_letter}{cat_start_row}:{cat_col_letter}{row_idx - 1}')
+                            ws1[f'{cat_col_letter}{cat_start_row}'].alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+                        # 开始新类别
+                        current_cat = cell_value
+                        cat_start_row = row_idx
+                else:
+                    # 处理最后一个类别
+                    if current_cat is not None and cat_start_row is not None and row_idx > cat_start_row:
+                        ws1.merge_cells(f'{cat_col_letter}{cat_start_row}:{cat_col_letter}{row_idx - 1}')
+                        ws1[f'{cat_col_letter}{cat_start_row}'].alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+            
+            # ========== 处理表2：合并土地利用类型一级分类 ==========
+            ws2 = wb["不同土地利用类型土壤质地"]
+            # 一级分类在第B列（Excel列，不是索引）
+            primary_col_letter = 'B'
+            secondary_col_letter = 'C'
+            data_start_row = 3  # 数据从第3行开始
+            
+            for start_idx, end_idx, primary_name in merge_info_land:
+                start_row = data_start_row + start_idx
+                end_row = data_start_row + end_idx
+                
+                # 检查是否一级=二级（如林地-林地）
+                if primary_name in ["林地", "草地", "其他"]:
+                    # 合并一级和二级列（B和C列）
+                    ws2.merge_cells(f'{primary_col_letter}{start_row}:{secondary_col_letter}{start_row}')
+                    ws2[f'{primary_col_letter}{start_row}'].alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+                else:
+                    # 合并一级列（仅B列）
+                    if end_row > start_row:
+                        ws2.merge_cells(f'{primary_col_letter}{start_row}:{primary_col_letter}{end_row}')
+                        ws2[f'{primary_col_letter}{start_row}'].alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+            
+            # ========== 处理表3：合并土壤类型亚类 ==========
+            ws3 = wb["不同土壤类型土壤质地"]
+            # 亚类在第B列
+            sub_col_letter = 'B'
+            data_start_row_soil = 3
+            
+            for start_idx, end_idx, sub_name in merge_info_soil:
+                start_row = data_start_row_soil + start_idx
+                end_row = data_start_row_soil + end_idx
+                if end_row > start_row:
+                    ws3.merge_cells(f'{sub_col_letter}{start_row}:{sub_col_letter}{end_row}')
+                    ws3[f'{sub_col_letter}{start_row}'].alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+            
+            # ========== 为所有表格添加居中对齐 ==========
+            for sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+                for row in ws.iter_rows():
+                    for cell in row:
+                        if cell.value is not None:
+                            cell.alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+            
+            # 隐藏索引列
+            for ws_name in wb.sheetnames:
+                ws = wb[ws_name]
+                ws.column_dimensions['A'].hidden = True
+            
+            wb.save(output_file)
+
+        return True, output_file
+
+    except Exception as e:
+        return False, str(e)
+
+
+# ========== GUI ==========
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("土壤质地(TRZD)统计工具")
+        self.root.geometry("580x320")
+        self.sample_file = None
+        self.area_files = None  # 支持多个制图文件
+
+        tk.Label(root, text="土壤质地(TRZD)分布统计", font=("Arial", 14, "bold")).pack(pady=10)
+        tk.Label(root,
+                 text="• 文件需包含列：TRZD, 二级地类(或DLMC), 行政区名称, YL(或SSub_JZg), TS(或SGen_JZg)\n• 制图文件额外需含：面积\n• TRZD 为中文质地名称（如'壤土'），'0'、'/'、空值将被忽略",
+                 fg="gray").pack()
+
+        tk.Button(root, text="📁 选择【样点统计.csv】", command=self.select_sample).pack(pady=6)
+        self.label_sample = tk.Label(root, text="未选择", fg="gray")
+        self.label_sample.pack()
+
+        tk.Button(root, text="📁 选择【制图统计.csv】（可多选）", command=self.select_area).pack(pady=6)
+        self.label_area = tk.Label(root, text="未选择", fg="gray")
+        self.label_area.pack()
+
+        tk.Button(root, text="✅ 生成统计表", command=self.run_process, bg="#4CAF50", fg="white",
+                  font=("Arial", 12)).pack(pady=15)
+
+    def select_sample(self):
+        f = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if f:
+            self.sample_file = f
+            self.label_sample.config(text=f.split("/")[-1], fg="black")
+
+    def select_area(self):
+        files = filedialog.askopenfilenames(filetypes=[("CSV files", "*.csv")])
+        if files:
+            self.area_files = list(files)
+            names = [f.split("/")[-1] for f in files]
+            if len(names) <= 3:
+                display = ", ".join(names)
+            else:
+                display = f"{len(names)} 个文件（{', '.join(names[:2])}...）"
+            self.label_area.config(text=display, fg="black")
+
+    def run_process(self):
+        if not self.sample_file or not self.area_files:
+            messagebox.showwarning("⚠️ 提示", "请先选择样点文件和至少一个制图文件！")
+            return
+
+        success, msg = process_trzd_files(self.sample_file, self.area_files, "")
+        if success:
+            messagebox.showinfo("🎉 成功", f"文件已生成：\n{msg}")
+        else:
+            messagebox.showerror("❌ 错误", f"处理失败：\n{msg}")
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()
