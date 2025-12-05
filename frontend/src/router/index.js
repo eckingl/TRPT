@@ -27,6 +27,12 @@ const routes = [
     name: 'Report',
     component: () => import('@/views/Report.vue'),
     meta: { title: '报告生成' }
+  },
+  {
+    path: '/attribute-process',
+    name: 'AttributeProcess',
+    component: () => import('@/views/AttributeProcess.vue'),
+    meta: { title: '属性图处理' }
   }
 ]
 

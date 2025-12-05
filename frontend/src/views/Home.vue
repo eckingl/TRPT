@@ -1,13 +1,15 @@
 <template>
-  <div class="home">
-    <!-- 标题 -->
-    <div class="header">
-      <h1>农业土壤普查报告生成系统</h1>
-      <p class="subtitle">请依次选择大类、专题和地区</p>
-    </div>
+  <div class="home-layout">
+    <!-- 主内容区 -->
+    <div class="home-main">
+      <!-- 标题 -->
+      <div class="header">
+        <h1>农业土壤普查报告生成系统</h1>
+        <p class="subtitle">请依次选择大类、专题和地区</p>
+      </div>
 
-    <!-- 层级选择区域 -->
-    <div class="selection-area">
+      <!-- 层级选择区域 -->
+      <div class="selection-area">
       <!-- 第一级：大类选择 -->
       <div class="level-section">
         <div class="level-title">
@@ -129,13 +131,37 @@
       </div>
     </div>
 
-    <!-- 系统状态 -->
-    <div class="status-bar">
-      <span>系统状态：</span>
-      <el-tag :type="healthStatus === 'ok' ? 'success' : 'danger'" size="small">
-        {{ healthStatus === 'ok' ? '正常' : '连接中...' }}
-      </el-tag>
-      <span class="version">v{{ version }}</span>
+      <!-- 系统状态 -->
+      <div class="status-bar">
+        <span>系统状态：</span>
+        <el-tag :type="healthStatus === 'ok' ? 'success' : 'danger'" size="small">
+          {{ healthStatus === 'ok' ? '正常' : '连接中...' }}
+        </el-tag>
+        <span class="version">v{{ version }}</span>
+      </div>
+    </div>
+
+    <!-- 右侧边栏：最近使用的工具 -->
+    <div class="home-sidebar" v-if="recentTools.length > 0">
+      <div class="sidebar-header">
+        <el-icon><Clock /></el-icon>
+        <span>最近使用</span>
+      </div>
+      <div class="recent-tools">
+        <div
+          v-for="tool in recentTools"
+          :key="tool.usedAt"
+          class="recent-tool-item"
+          @click="handleRecentTool(tool)"
+        >
+          <el-icon :size="20"><component :is="tool.icon" /></el-icon>
+          <div class="tool-info">
+            <span class="tool-name">{{ tool.name }}</span>
+            <span class="tool-region" v-if="tool.region">{{ tool.region }}</span>
+            <span class="tool-time">{{ formatRelativeTime(tool.usedAt) }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 新建地区对话框 -->
@@ -199,7 +225,8 @@ import {
   Upload,
   Setting,
   Document as DocIcon,
-  View
+  View,
+  Clock
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { checkHealth, getRegions, createRegion, deleteRegion } from '@/api'
@@ -377,6 +404,12 @@ const topics = {
 // 操作列表
 const actions = [
   {
+    id: 'attribute-process',
+    name: '属性图数据处理',
+    description: '处理样点和制图统计数据',
+    icon: DataAnalysis
+  },
+  {
     id: 'upload',
     name: '上传数据',
     description: '上传或更新数据文件',
@@ -524,7 +557,13 @@ const handleDeleteRegion = async (region) => {
 
 // 处理操作
 const handleAction = (actionId) => {
+  // 记录最近使用的工具
+  addRecentTool(actionId)
+
   switch (actionId) {
+    case 'attribute-process':
+      router.push('/attribute-process')
+      break
     case 'upload':
       router.push('/upload')
       break
@@ -537,6 +576,45 @@ const handleAction = (actionId) => {
     case 'generate':
       router.push('/report')
       break
+  }
+}
+
+// 最近使用的工具
+const recentTools = ref([])
+
+// 添加最近使用的工具
+const addRecentTool = (toolId) => {
+  const tool = actions.find(a => a.id === toolId)
+  if (!tool) return
+
+  // 移除已存在的相同工具
+  recentTools.value = recentTools.value.filter(t => t.id !== toolId)
+
+  // 添加到最前面
+  recentTools.value.unshift({
+    ...tool,
+    usedAt: new Date().toISOString(),
+    region: selectedRegion.value?.name || ''
+  })
+
+  // 最多保留5个
+  if (recentTools.value.length > 5) {
+    recentTools.value = recentTools.value.slice(0, 5)
+  }
+
+  // 保存到 localStorage
+  localStorage.setItem('recentTools', JSON.stringify(recentTools.value))
+}
+
+// 加载最近使用的工具
+const loadRecentTools = () => {
+  try {
+    const saved = localStorage.getItem('recentTools')
+    if (saved) {
+      recentTools.value = JSON.parse(saved)
+    }
+  } catch {
+    recentTools.value = []
   }
 }
 
@@ -557,7 +635,32 @@ const formatTime = (isoString) => {
   return date.toLocaleDateString('zh-CN')
 }
 
+// 格式化相对时间
+const formatRelativeTime = (isoString) => {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  const now = new Date()
+  const diff = now - date
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  if (hours < 24) return `${hours}小时前`
+  if (days < 7) return `${days}天前`
+  return date.toLocaleDateString('zh-CN')
+}
+
+// 处理最近使用的工具点击
+const handleRecentTool = (tool) => {
+  handleAction(tool.id)
+}
+
 onMounted(async () => {
+  // 加载最近使用的工具
+  loadRecentTools()
+
   try {
     const data = await checkHealth()
     healthStatus.value = data.status
@@ -574,10 +677,101 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.home {
-  max-width: 1000px;
+/* 主布局 */
+.home-layout {
+  display: flex;
+  gap: 24px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 30px 20px;
+}
+
+.home-main {
+  flex: 1;
+  max-width: 1000px;
+}
+
+/* 右侧边栏 */
+.home-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  height: fit-content;
+  position: sticky;
+  top: 80px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.sidebar-header .el-icon {
+  color: var(--el-color-primary);
+}
+
+.recent-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recent-tool-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.recent-tool-item:hover {
+  background: #ecf5ff;
+  transform: translateX(4px);
+}
+
+.recent-tool-item .el-icon {
+  color: var(--el-color-primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.tool-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tool-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.tool-region {
+  font-size: 12px;
+  color: #606266;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-time {
+  font-size: 11px;
+  color: #909399;
 }
 
 .header {

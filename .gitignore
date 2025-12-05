@@ -1,0 +1,11 @@
+# Windows reserved device names (MUST be ignored)
+nul
+con
+prn
+aux
+com[1-9]
+lpt[1-9]
+
+# Also ignore system metadata
+Thumbs.db
+.DS_Store

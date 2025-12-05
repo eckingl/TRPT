@@ -17,7 +17,16 @@
       "Bash(python -m uvicorn:*)",
       "Bash(curl:*)",
       "Bash(npm run dev:*)",
-      "Bash(del \"C:\\Users\\ECKin\\Desktop\\TRPC\\backend\\data\\projects.db\")"
+      "Bash(del \"C:\\Users\\ECKin\\Desktop\\TRPC\\backend\\data\\projects.db\")",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(//C/Windows/System32/taskkill.exe //PID 30500 //F)",
+      "Bash(cmd.exe /c \"taskkill /PID 30500 /F\")",
+      "Bash(tasklist:*)",
+      "Bash(cmd.exe /c \"taskkill /F /FI \"\"IMAGENAME eq python.exe\"\" /FI \"\"WINDOWTITLE ne Administrator*\"\" 2>nul\")",
+      "Bash(python -m ruff check:*)",
+      "Bash(python -m ruff format:*)"
     ],
     "deny": [],
     "ask": []

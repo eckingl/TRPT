@@ -13,6 +13,7 @@
           router
         >
           <el-menu-item index="/">首页</el-menu-item>
+          <el-menu-item index="/attribute-process">属性图处理</el-menu-item>
           <el-menu-item index="/upload">数据上传</el-menu-item>
           <el-menu-item index="/config">项目配置</el-menu-item>
           <el-menu-item index="/report">报告生成</el-menu-item>

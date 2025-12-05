@@ -1,10 +1,9 @@
 """本地 SQLite 数据库管理"""
 
 import json
-import aiosqlite
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
+
+import aiosqlite
 
 from app.config import get_settings
 
@@ -70,9 +69,9 @@ class Database:
         category: str,
         topic: str,
         item: str,
-        province: Optional[str] = None,
-        city: Optional[str] = None,
-        county: Optional[str] = None,
+        province: str | None = None,
+        city: str | None = None,
+        county: str | None = None,
     ) -> int:
         """创建新地区项目
 
@@ -102,9 +101,9 @@ class Database:
 
     async def get_regions(
         self,
-        category: Optional[str] = None,
-        topic: Optional[str] = None,
-        item: Optional[str] = None,
+        category: str | None = None,
+        topic: str | None = None,
+        item: str | None = None,
     ) -> list[dict]:
         """获取地区列表
 
@@ -139,7 +138,7 @@ class Database:
 
             return [dict(row) for row in rows]
 
-    async def get_region_by_id(self, region_id: int) -> Optional[dict]:
+    async def get_region_by_id(self, region_id: int) -> dict | None:
         """根据ID获取地区"""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -172,7 +171,7 @@ class Database:
         region_id: int,
         data_type: str,
         data_content: str,
-        file_name: Optional[str] = None,
+        file_name: str | None = None,
     ) -> int:
         """保存项目数据（覆盖已有数据）
 
@@ -214,7 +213,7 @@ class Database:
             return cursor.lastrowid or 0
 
     async def get_project_data(
-        self, region_id: int, data_type: Optional[str] = None
+        self, region_id: int, data_type: str | None = None
     ) -> list[dict]:
         """获取项目数据"""
         async with aiosqlite.connect(self.db_path) as db:
@@ -248,7 +247,7 @@ class Database:
             )
             await db.commit()
 
-    async def get_project_config(self, region_id: int) -> Optional[dict]:
+    async def get_project_config(self, region_id: int) -> dict | None:
         """获取项目配置"""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row

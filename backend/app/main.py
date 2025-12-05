@@ -10,7 +10,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import router as api_router
 from app.config import get_settings
-from app.models import HealthResponse
+from app.models import HealthResponse, TopicInfo
+from app.topics import get_available_topics
 
 
 @asynccontextmanager
@@ -59,6 +60,13 @@ def create_app() -> FastAPI:
     async def health_check() -> HealthResponse:
         """健康检查"""
         return HealthResponse(status="ok", version=settings.APP_VERSION)
+
+    # 专题列表端点
+    @app.get("/api/topics", response_model=list[TopicInfo])
+    async def list_topics() -> list[TopicInfo]:
+        """获取可用专题列表"""
+        topics = get_available_topics()
+        return [TopicInfo(**topic) for topic in topics]
 
     # 挂载静态文件（前端构建产物）
     frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"

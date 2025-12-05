@@ -70,6 +70,55 @@ export const generateReport = (topicId, config) =>
 export const downloadReport = (reportId) =>
   api.get(`/report/download/${reportId}`, { responseType: 'blob' })
 
+/**
+ * 上传多个文件
+ * @param {File[]} files - 要上传的文件列表
+ */
+export const uploadMultipleFiles = (files) => {
+  const formData = new FormData()
+  files.forEach(file => {
+    formData.append('files', file)
+  })
+  return api.post('/upload/multiple', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+/**
+ * 处理属性图数据
+ * @param {string[]} sampleFiles - 样点文件路径列表
+ * @param {string[]} areaFiles - 制图文件路径列表
+ */
+export const processAttributeData = (sampleFiles, areaFiles) =>
+  api.post('/report/attribute-data', {
+    sample_files: sampleFiles,
+    area_files: areaFiles
+  })
+
+/**
+ * 处理属性图上图数据
+ * @param {string[]} areaFiles - 制图文件路径列表
+ */
+export const processMappingData = (areaFiles) =>
+  api.post('/report/mapping-data', {
+    area_files: areaFiles
+  })
+
+/**
+ * 获取报告列表
+ */
+export const getReportList = () => api.get('/report/list')
+
+/**
+ * 下载报告文件
+ * @param {string} filename - 文件名
+ */
+export const downloadReportFile = (filename) => {
+  return `/api/report/download/${encodeURIComponent(filename)}`
+}
+
 // ============ 地区管理 API ============
 
 /**
