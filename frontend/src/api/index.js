@@ -70,4 +70,37 @@ export const generateReport = (topicId, config) =>
 export const downloadReport = (reportId) =>
   api.get(`/report/download/${reportId}`, { responseType: 'blob' })
 
+// ============ 地区管理 API ============
+
+/**
+ * 获取地区列表
+ * @param {object} params - 筛选参数
+ */
+export const getRegions = (params = {}) => api.get('/regions', { params })
+
+/**
+ * 创建地区
+ * @param {object} data - 地区数据
+ */
+export const createRegion = (data) => api.post('/regions', data)
+
+/**
+ * 获取单个地区
+ * @param {number} regionId - 地区ID
+ */
+export const getRegion = (regionId) => api.get(`/regions/${regionId}`)
+
+/**
+ * 更新地区
+ * @param {number} regionId - 地区ID
+ * @param {object} data - 更新数据
+ */
+export const updateRegion = (regionId, data) => api.put(`/regions/${regionId}`, data)
+
+/**
+ * 删除地区
+ * @param {number} regionId - 地区ID
+ */
+export const deleteRegion = (regionId) => api.delete(`/regions/${regionId}`)
+
 export default api

@@ -16,10 +16,17 @@ from app.models import HealthResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """应用生命周期管理"""
+    from app.core.database import db
+
     settings = get_settings()
     print(f"[启动] {settings.APP_NAME} v{settings.APP_VERSION}")
     print(f"[配置] 模板目录: {settings.TEMPLATES_DIR}")
     print(f"[配置] 输出目录: {settings.OUTPUT_DIR}")
+
+    # 初始化数据库
+    await db.init_db()
+    print("[数据库] 初始化完成")
+
     yield
     print("[关闭] 应用已关闭")
 
