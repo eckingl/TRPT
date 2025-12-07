@@ -18,6 +18,7 @@ from app.topics.attribute_map import process_attribute_data, process_mapping_dat
 from app.topics.attribute_map.config import (
     SOIL_ATTR_CONFIG,
     detect_available_attributes,
+    get_grade_order,
 )
 from app.topics.attribute_map.excel_reader import (
     get_available_attributes_from_excel,
@@ -220,8 +221,7 @@ async def process_attribute_data_api(request: AttributeDataRequest) -> ProcessRe
                     df_a = df_a.rename(columns={orig_col: attr_key})
 
             # 计算统计
-            levels = config.get("levels", [])
-            grade_order = [level[1] for level in levels]
+            grade_order = get_grade_order(attr_key)
 
             try:
                 stats = compute_attribute_stats(df_s, df_a, attr_key, grade_order)
@@ -505,9 +505,7 @@ async def generate_word_report(request: WordReportRequest) -> ProcessResponse:
         # 计算各属性的统计数据
         stats_list: list[AttributeStats] = []
         for attr_key in attr_keys:
-            config = SOIL_ATTR_CONFIG[attr_key]
-            levels = config.get("levels", [])
-            grade_order = [level[1] for level in levels]
+            grade_order = get_grade_order(attr_key)
 
             stats = compute_attribute_stats(df_sample, df_area, attr_key, grade_order)
             stats_list.append(stats)
@@ -625,8 +623,7 @@ def _reload_stats_from_record(process_id: str) -> list[AttributeStats]:
                     df_a = df_a.rename(columns={orig_col: attr_key})
 
             # 计算统计
-            levels = config.get("levels", [])
-            grade_order = [level[1] for level in levels]
+            grade_order = get_grade_order(attr_key)
 
             try:
                 stats = compute_attribute_stats(df_s, df_a, attr_key, grade_order)

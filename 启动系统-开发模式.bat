@@ -69,6 +69,7 @@ echo [启动] 开发模式启动中...
 echo ================================================
 echo.
 echo 后端服务: http://127.0.0.1:8000
+echo 后端文档: http://127.0.0.1:8000/docs
 echo 前端服务: http://localhost:5173
 echo.
 echo 前端自动代理后端 API 请求到 http://127.0.0.1:8000
@@ -77,12 +78,21 @@ echo 按 Ctrl+C 停止所有服务
 echo ================================================
 echo.
 
-REM 启动后端服务（新窗口）
-start "后端服务 - FastAPI" /min cmd /c "cd /d "%~dp0backend" && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
+REM 启动后端服务（新窗口，不最小化以便查看日志）
+echo [启动] 正在启动后端服务...
+start "后端服务 - FastAPI" cmd /k "cd /d %~dp0backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
 
 REM 等待后端启动
 echo [等待] 后端服务启动中...
-timeout /t 3 /nobreak >nul
+timeout /t 5 /nobreak >nul
+
+REM 检查后端是否启动成功
+echo [检查] 验证后端服务...
+curl -s http://127.0.0.1:8000/api/health >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [警告] 后端服务可能未完全启动，请稍等...
+    timeout /t 3 /nobreak >nul
+)
 
 REM 启动前端服务（当前窗口）
 echo [启动] 前端服务启动中...

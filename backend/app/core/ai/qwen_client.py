@@ -81,6 +81,7 @@ def _call_deepseek(prompt: str, config: AIConfig) -> str:
     client = OpenAI(
         api_key=config.api_key,
         base_url="https://api.deepseek.com",
+        timeout=60.0,  # 60秒超时
     )
 
     response = client.chat.completions.create(

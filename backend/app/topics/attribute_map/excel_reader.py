@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
-from app.topics.attribute_map.config import SOIL_ATTR_CONFIG
+from app.topics.attribute_map.config import SOIL_ATTR_CONFIG, get_grade_order
 
 
 @dataclass
@@ -89,7 +89,7 @@ def read_excel_stats(
     # 读取总体情况sheet（名称格式：{attr_name}总体情况）
     overall_sheet_name = f"{attr_name}总体情况"
     if overall_sheet_name in wb.sheetnames:
-        _read_overall_sheet(wb[overall_sheet_name], stats, config)
+        _read_overall_sheet(wb[overall_sheet_name], stats, attr_key)
 
     # 读取土地利用类型sheet（名称格式：{attr_name}不同土地利用类型）
     land_use_sheet_name = f"{attr_name}不同土地利用类型"
@@ -110,10 +110,9 @@ def read_excel_stats(
     return stats
 
 
-def _read_overall_sheet(ws, stats: ExcelAttributeStats, config: dict) -> None:
+def _read_overall_sheet(ws, stats: ExcelAttributeStats, attr_key: str) -> None:
     """读取总体情况sheet"""
-    levels = config.get("levels", [])
-    grade_order = [level[1] for level in levels]
+    grade_order = get_grade_order(attr_key)
 
     # 数据从第4行开始
     for i, grade in enumerate(grade_order):

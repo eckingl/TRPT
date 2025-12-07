@@ -1,5 +1,6 @@
 """FastAPI 应用入口"""
 
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,6 +18,23 @@ from app.topics import attribute_map as _  # noqa: F401
 from app.topics import get_available_topics
 
 
+def get_frontend_dist_path() -> Path | None:
+    """获取前端静态文件路径（支持打包后运行）"""
+    # 打包模式：从临时目录中获取
+    if getattr(sys, 'frozen', False):
+        base = Path(sys._MEIPASS)
+        frontend_dist = base / "frontend" / "dist"
+        if frontend_dist.exists():
+            return frontend_dist
+
+    # 开发模式：从项目目录获取
+    frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
+    if frontend_dist.exists():
+        return frontend_dist
+
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """应用生命周期管理"""
@@ -24,7 +42,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     settings = get_settings()
     print(f"[启动] {settings.APP_NAME} v{settings.APP_VERSION}")
-    print(f"[配置] 模板目录: {settings.TEMPLATES_DIR}")
+    print(f"[配置] 基础目录: {settings.BASE_DIR}")
+    print(f"[配置] 上传目录: {settings.UPLOAD_DIR}")
     print(f"[配置] 输出目录: {settings.OUTPUT_DIR}")
 
     # 初始化数据库
@@ -46,10 +65,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # 配置 CORS
+    # 配置 CORS（开发模式需要）
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -72,9 +96,12 @@ def create_app() -> FastAPI:
         return [TopicInfo(**topic) for topic in topics]
 
     # 挂载静态文件（前端构建产物）
-    frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
-    if frontend_dist.exists():
+    frontend_dist = get_frontend_dist_path()
+    if frontend_dist:
+        print(f"[静态文件] 挂载目录: {frontend_dist}")
         app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
+    else:
+        print("[静态文件] 未找到前端构建产物，请先运行 npm run build")
 
     return app
 

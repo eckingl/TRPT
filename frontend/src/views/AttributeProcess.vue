@@ -359,14 +359,27 @@
                   </el-col>
                 </el-row>
 
-                <!-- 单属性模式下选择具体属性 -->
+                <!-- 单属性模式下选择具体属性（支持多选，按顺序生成） -->
                 <el-row v-if="reportConfig.report_mode === 'single'" :gutter="20">
                   <el-col :span="24">
                     <el-form-item label="选择属性" required>
+                      <div class="select-actions">
+                        <el-button type="primary" link @click="selectAllAttributes">
+                          <el-icon><Select /></el-icon>
+                          全选
+                        </el-button>
+                        <el-button type="info" link @click="clearAllAttributes">
+                          <el-icon><Close /></el-icon>
+                          清空
+                        </el-button>
+                      </div>
                       <el-select
-                        v-model="selectedSingleAttribute"
+                        v-model="selectedSingleAttributes"
                         style="width: 100%"
-                        placeholder="请选择要生成报告的属性"
+                        placeholder="请选择要生成报告的属性（可多选，按顺序生成）"
+                        multiple
+                        collapse-tags
+                        collapse-tags-tooltip
                       >
                         <el-option
                           v-for="attr in currentPreviewList"
@@ -375,6 +388,12 @@
                           :value="attr.key"
                         />
                       </el-select>
+                      <div class="select-hint">
+                        <span v-if="selectedSingleAttributes.length > 0">
+                          已选 {{ selectedSingleAttributes.length }}/{{ currentPreviewList.length }} 个属性，将按顺序生成 {{ selectedSingleAttributes.length }} 份报告
+                        </span>
+                        <span v-else>支持多选，每个属性将单独生成一份报告</span>
+                      </div>
                     </el-form-item>
                   </el-col>
                 </el-row>
@@ -401,10 +420,11 @@
                     type="primary"
                     size="large"
                     :loading="generatingReport"
+                    :disabled="generatingReport"
                     @click="generateWordReport"
                   >
                     <el-icon><Document /></el-icon>
-                    生成 Word 报告
+                    {{ generatingReport ? '生成中...' : '生成 Word 报告' }}
                   </el-button>
                 </el-form-item>
               </el-form>
@@ -412,22 +432,93 @@
           </el-collapse-transition>
         </div>
 
+        <!-- 生成进度条 -->
+        <div v-if="generatingReport && generateProgress.total > 0" class="progress-section">
+          <div class="progress-header">
+            <span class="progress-title">正在生成报告...</span>
+            <span class="progress-count">{{ generateProgress.current }}/{{ generateProgress.total }}</span>
+          </div>
+          <el-progress
+            :percentage="Math.round((generateProgress.current / generateProgress.total) * 100)"
+            :status="generateProgress.currentError ? 'exception' : ''"
+            :stroke-width="20"
+            striped
+            striped-flow
+          />
+          <div class="progress-current">
+            <el-icon class="is-loading" v-if="!generateProgress.currentError"><Loading /></el-icon>
+            <span>{{ generateProgress.currentAttr }}</span>
+          </div>
+        </div>
+
         <!-- 报告生成结果 -->
         <div v-if="reportResult" class="report-result">
+          <!-- 成功结果 -->
           <el-result
-            :icon="reportResult.success ? 'success' : 'error'"
-            :title="reportResult.success ? '报告生成成功' : '报告生成失败'"
+            v-if="reportResult.success"
+            icon="success"
+            :title="`报告生成完成`"
             :sub-title="reportResult.message"
           >
             <template #extra>
-              <el-button
-                v-if="reportResult.success && reportResult.download_url"
-                type="primary"
-                @click="downloadWordReport"
-              >
-                <el-icon><Download /></el-icon>
-                下载 Word 报告
-              </el-button>
+              <div class="result-stats">
+                <el-tag type="success" size="large">
+                  成功: {{ reportResult.successCount }} 份
+                </el-tag>
+                <el-tag v-if="reportResult.failedCount > 0" type="danger" size="large">
+                  失败: {{ reportResult.failedCount }} 份
+                </el-tag>
+              </div>
+
+              <!-- 生成的文件列表 -->
+              <div v-if="reportResult.generatedFiles && reportResult.generatedFiles.length > 0" class="generated-files">
+                <div class="files-header">
+                  <span>已生成 {{ reportResult.generatedFiles.length }} 份报告：</span>
+                  <el-button type="primary" size="small" @click="downloadAllReports">
+                    <el-icon><Download /></el-icon>
+                    批量下载全部
+                  </el-button>
+                </div>
+                <div class="files-list">
+                  <div v-for="(file, index) in reportResult.generatedFiles" :key="index" class="file-item-download">
+                    <el-icon><Document /></el-icon>
+                    <span class="file-name">{{ file.attrName }}</span>
+                    <el-button type="primary" link size="small" @click="downloadFile(file.url)">
+                      <el-icon><Download /></el-icon>
+                      下载
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 失败列表 -->
+              <div v-if="reportResult.failedList && reportResult.failedList.length > 0" class="failed-list">
+                <el-collapse>
+                  <el-collapse-item title="查看失败详情" name="1">
+                    <div v-for="(fail, index) in reportResult.failedList" :key="index" class="failed-item">
+                      <el-tag type="danger" size="small">{{ fail.attrName }}</el-tag>
+                      <span class="error-msg">{{ fail.error }}</span>
+                    </div>
+                  </el-collapse-item>
+                </el-collapse>
+              </div>
+            </template>
+          </el-result>
+
+          <!-- 全部失败 -->
+          <el-result
+            v-else
+            icon="error"
+            title="报告生成失败"
+            :sub-title="reportResult.message"
+          >
+            <template #extra>
+              <div v-if="reportResult.failedList && reportResult.failedList.length > 0" class="failed-list">
+                <div v-for="(fail, index) in reportResult.failedList" :key="index" class="failed-item">
+                  <el-tag type="danger" size="small">{{ fail.attrName }}</el-tag>
+                  <span class="error-msg">{{ fail.error }}</span>
+                </div>
+              </div>
             </template>
           </el-result>
         </div>
@@ -593,7 +684,10 @@ import {
   ArrowLeft,
   ArrowDown,
   ArrowUp,
-  FolderOpened
+  FolderOpened,
+  Select,
+  Close,
+  Loading
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -624,7 +718,7 @@ const showReportForm = ref(false)
 const generatingReport = ref(false)
 const reportResult = ref(null)
 const selectedAttributes = ref([])
-const selectedSingleAttribute = ref('')  // 单属性模式下选中的属性
+const selectedSingleAttributes = ref([])  // 单属性模式下选中的属性列表（支持多选）
 const reportConfig = ref({
   region_id: null,
   region_name: '',
@@ -635,10 +729,28 @@ const reportConfig = ref({
   ai_provider: 'deepseek'
 })
 
+// 生成进度
+const generateProgress = ref({
+  current: 0,
+  total: 0,
+  currentAttr: '',
+  currentError: false
+})
+
 // 当前预览数据列表（用于单属性选择）
 const currentPreviewList = computed(() => {
   return processResult.value?.preview || []
 })
+
+// 全选属性
+const selectAllAttributes = () => {
+  selectedSingleAttributes.value = currentPreviewList.value.map(attr => attr.key)
+}
+
+// 清空选择
+const clearAllAttributes = () => {
+  selectedSingleAttributes.value = []
+}
 
 // 属性图数据处理的文件
 const sampleFiles = ref([])
@@ -887,14 +999,22 @@ const generateWordReport = async () => {
     return
   }
 
-  // 单属性模式下必须选择一个属性
-  if (reportConfig.value.report_mode === 'single' && !selectedSingleAttribute.value) {
+  // 单属性模式下必须选择至少一个属性
+  if (reportConfig.value.report_mode === 'single' && selectedSingleAttributes.value.length === 0) {
     ElMessage.warning('请选择要生成报告的属性')
     return
   }
 
   generatingReport.value = true
   reportResult.value = null
+
+  // 重置进度
+  generateProgress.value = {
+    current: 0,
+    total: 0,
+    currentAttr: '',
+    currentError: false
+  }
 
   try {
     // 确定地区名称
@@ -906,42 +1026,155 @@ const generateWordReport = async () => {
       }
     }
 
-    // 确定要包含的属性列表
-    let attributesToInclude = null
-    if (reportConfig.value.report_mode === 'single') {
-      // 单属性模式：只包含选中的单个属性
-      attributesToInclude = [selectedSingleAttribute.value]
-    } else if (selectedAttributes.value.length > 0) {
-      // 其他模式：使用多选的属性（如果有）
-      attributesToInclude = selectedAttributes.value
-    }
+    // 单属性模式：按顺序逐个生成报告
+    if (reportConfig.value.report_mode === 'single' && selectedSingleAttributes.value.length > 0) {
+      const totalCount = selectedSingleAttributes.value.length
+      const generatedFiles = []  // 成功生成的文件列表
+      const failedList = []  // 失败的属性列表
 
-    const params = {
-      process_id: processResult.value.process_id,
-      region_name: regionName || 'XX县',
-      survey_year: reportConfig.value.survey_year,
-      theme: reportConfig.value.theme,
-      report_mode: reportConfig.value.report_mode,
-      use_ai: reportConfig.value.use_ai,
-      ai_provider: reportConfig.value.use_ai ? reportConfig.value.ai_provider : null,
-      attributes: attributesToInclude
-    }
+      // 设置进度总数
+      generateProgress.value.total = totalCount
 
-    const result = await generateReportFromProcess(params)
-    reportResult.value = result
+      for (let i = 0; i < totalCount; i++) {
+        const attrKey = selectedSingleAttributes.value[i]
+        const attrInfo = currentPreviewList.value.find(a => a.key === attrKey)
+        const attrName = attrInfo?.name || attrKey
 
-    if (result.success) {
-      ElMessage.success('报告生成成功')
-      refreshHistory()
+        // 更新进度
+        generateProgress.value.current = i + 1
+        generateProgress.value.currentAttr = `正在生成: ${attrName}`
+        generateProgress.value.currentError = false
+
+        const params = {
+          process_id: processResult.value.process_id,
+          region_name: regionName || 'XX县',
+          survey_year: reportConfig.value.survey_year,
+          theme: reportConfig.value.theme,
+          report_mode: 'single',
+          use_ai: reportConfig.value.use_ai,
+          ai_provider: reportConfig.value.use_ai ? reportConfig.value.ai_provider : null,
+          attributes: [attrKey]
+        }
+
+        try {
+          const result = await generateReportFromProcess(params)
+          if (result.success) {
+            generatedFiles.push({
+              attrKey,
+              attrName,
+              filename: result.filename,
+              url: result.download_url
+            })
+          } else {
+            generateProgress.value.currentError = true
+            failedList.push({
+              attrKey,
+              attrName,
+              error: result.message || '生成失败'
+            })
+          }
+        } catch (err) {
+          generateProgress.value.currentError = true
+          failedList.push({
+            attrKey,
+            attrName,
+            error: err.message || '请求超时或网络错误'
+          })
+          console.error(`生成 ${attrName} 报告失败:`, err)
+        }
+      }
+
+      // 汇总结果
+      const successCount = generatedFiles.length
+      const failedCount = failedList.length
+
+      if (successCount > 0) {
+        reportResult.value = {
+          success: true,
+          message: failedCount > 0
+            ? `成功生成 ${successCount} 份报告，${failedCount} 份失败`
+            : `成功生成 ${successCount} 份报告`,
+          successCount,
+          failedCount,
+          generatedFiles,
+          failedList
+        }
+        ElMessage.success(`报告生成完成：成功 ${successCount} 份${failedCount > 0 ? `，失败 ${failedCount} 份` : ''}`)
+        refreshHistory()
+      } else {
+        reportResult.value = {
+          success: false,
+          message: '所有报告生成失败',
+          successCount: 0,
+          failedCount,
+          generatedFiles: [],
+          failedList
+        }
+        ElMessage.error('所有报告生成失败')
+      }
+    } else {
+      // 其他模式：一次性生成
+      generateProgress.value.total = 1
+      generateProgress.value.current = 1
+      generateProgress.value.currentAttr = '正在生成综合报告...'
+
+      let attributesToInclude = null
+      if (selectedAttributes.value.length > 0) {
+        attributesToInclude = selectedAttributes.value
+      }
+
+      const params = {
+        process_id: processResult.value.process_id,
+        region_name: regionName || 'XX县',
+        survey_year: reportConfig.value.survey_year,
+        theme: reportConfig.value.theme,
+        report_mode: reportConfig.value.report_mode,
+        use_ai: reportConfig.value.use_ai,
+        ai_provider: reportConfig.value.use_ai ? reportConfig.value.ai_provider : null,
+        attributes: attributesToInclude
+      }
+
+      const result = await generateReportFromProcess(params)
+
+      if (result.success) {
+        reportResult.value = {
+          success: true,
+          message: result.message,
+          successCount: 1,
+          failedCount: 0,
+          generatedFiles: [{
+            attrName: '综合报告',
+            filename: result.filename,
+            url: result.download_url
+          }],
+          failedList: []
+        }
+        ElMessage.success('报告生成成功')
+        refreshHistory()
+      } else {
+        reportResult.value = {
+          success: false,
+          message: result.message,
+          successCount: 0,
+          failedCount: 1,
+          generatedFiles: [],
+          failedList: [{ attrName: '综合报告', error: result.message }]
+        }
+      }
     }
   } catch (error) {
     reportResult.value = {
       success: false,
-      message: error.message || '报告生成失败'
+      message: error.message || '报告生成失败',
+      successCount: 0,
+      failedCount: 1,
+      generatedFiles: [],
+      failedList: [{ attrName: '未知', error: error.message }]
     }
     ElMessage.error(error.message || '报告生成失败')
   } finally {
     generatingReport.value = false
+    generateProgress.value.currentAttr = '完成'
   }
 }
 
@@ -950,6 +1183,23 @@ const downloadWordReport = () => {
   if (reportResult.value?.download_url) {
     window.open(reportResult.value.download_url, '_blank')
   }
+}
+
+// 批量下载所有报告
+const downloadAllReports = () => {
+  if (!reportResult.value?.generatedFiles?.length) {
+    ElMessage.warning('没有可下载的报告')
+    return
+  }
+
+  // 逐个触发下载
+  reportResult.value.generatedFiles.forEach((file, index) => {
+    setTimeout(() => {
+      window.open(file.url, '_blank')
+    }, index * 500)  // 每500ms下载一个，避免浏览器阻止
+  })
+
+  ElMessage.success(`正在下载 ${reportResult.value.generatedFiles.length} 份报告...`)
 }
 
 // 刷新历史记录
@@ -984,14 +1234,14 @@ const selectProcessRecord = (record) => {
   showReportForm.value = true
   // 重置选择
   selectedAttributes.value = []
-  selectedSingleAttribute.value = ''
+  selectedSingleAttributes.value = []
   reportResult.value = null
   ElMessage.success('已加载历史处理记录，请配置报告参数')
 }
 
 // 报告模式变化时重置单属性选择
 const onReportModeChange = () => {
-  selectedSingleAttribute.value = ''
+  selectedSingleAttributes.value = []
 }
 
 // 地区选择变化
@@ -1284,6 +1534,142 @@ onMounted(() => {
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid #e4e7ed;
+}
+
+/* 属性选择提示 */
+.select-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 全选/清空按钮 */
+.select-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* 进度条区域 */
+.progress-section {
+  margin: 20px 0;
+  padding: 20px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.progress-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.progress-count {
+  font-size: 14px;
+  color: #409eff;
+  font-weight: 600;
+}
+
+.progress-current {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.progress-current .is-loading {
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 结果统计 */
+.result-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* 生成的文件列表 */
+.generated-files {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #303133;
+}
+
+.files-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.file-item-download {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.file-item-download:last-child {
+  border-bottom: none;
+}
+
+.file-item-download .el-icon {
+  color: #409eff;
+}
+
+.file-item-download .file-name {
+  flex: 1;
+  font-size: 14px;
+  color: #303133;
+}
+
+/* 失败列表 */
+.failed-list {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.failed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.failed-item:last-child {
+  border-bottom: none;
+}
+
+.error-msg {
+  flex: 1;
+  font-size: 12px;
+  color: #f56c6c;
+  word-break: break-all;
 }
 
 /* 历史记录卡片 */

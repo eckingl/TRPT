@@ -40,11 +40,20 @@ def get_file_extension(filename: str) -> str:
 
 
 def generate_unique_filename(original_filename: str) -> str:
-    """生成唯一文件名"""
+    """生成唯一文件名，保留原文件名并添加时间戳
+
+    格式: 原文件名_时间戳.扩展名
+    例如: 样点统计数据_20241208_143025.csv
+    """
     ext = get_file_extension(original_filename)
-    unique_id = uuid.uuid4().hex[:8]
+    # 获取不含扩展名的原文件名
+    name_without_ext = Path(original_filename).stem
+    # 清理文件名中的特殊字符
+    safe_name = "".join(c for c in name_without_ext if c.isalnum() or c in "._- 中文")
+    # 保留中文字符
+    safe_name = name_without_ext.replace("/", "_").replace("\\", "_")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"{timestamp}_{unique_id}{ext}"
+    return f"{safe_name}_{timestamp}{ext}"
 
 
 @router.post("/upload", response_model=FileUploadResponse)
@@ -263,3 +272,118 @@ async def get_uploaded_file_info(filename: str) -> FileUploadResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"文件读取失败: {str(e)}",
         )
+
+
+@router.delete("/upload/files/{filename}")
+async def delete_uploaded_file(filename: str) -> dict:
+    """删除已上传的文件
+
+    Args:
+        filename: 文件名
+
+    Returns:
+        删除结果
+    """
+    file_path = settings.UPLOAD_DIR / filename
+
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"文件不存在: {filename}",
+        )
+
+    try:
+        file_path.unlink()
+        return {"success": True, "message": f"文件 {filename} 已删除"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"删除失败: {str(e)}",
+        )
+
+
+@router.delete("/upload/files")
+async def delete_multiple_files(filenames: list[str]) -> dict:
+    """批量删除已上传的文件
+
+    Args:
+        filenames: 文件名列表
+
+    Returns:
+        删除结果
+    """
+    deleted = []
+    failed = []
+
+    for filename in filenames:
+        file_path = settings.UPLOAD_DIR / filename
+        if file_path.exists():
+            try:
+                file_path.unlink()
+                deleted.append(filename)
+            except Exception as e:
+                failed.append({"filename": filename, "error": str(e)})
+        else:
+            failed.append({"filename": filename, "error": "文件不存在"})
+
+    return {
+        "success": len(failed) == 0,
+        "deleted_count": len(deleted),
+        "failed_count": len(failed),
+        "deleted": deleted,
+        "failed": failed,
+    }
+
+
+@router.get("/upload/stats")
+async def get_upload_stats() -> dict:
+    """获取上传文件统计信息
+
+    Returns:
+        统计信息
+    """
+    if not settings.UPLOAD_DIR.exists():
+        return {
+            "total_files": 0,
+            "total_size": 0,
+            "total_size_readable": "0 B",
+            "file_types": {},
+        }
+
+    total_files = 0
+    total_size = 0
+    file_types: dict[str, int] = {}
+
+    for file_path in settings.UPLOAD_DIR.iterdir():
+        if not file_path.is_file():
+            continue
+
+        ext = get_file_extension(file_path.name)
+        if ext not in settings.ALLOWED_EXTENSIONS:
+            continue
+
+        total_files += 1
+        total_size += file_path.stat().st_size
+
+        if ext in file_types:
+            file_types[ext] += 1
+        else:
+            file_types[ext] = 1
+
+    # 格式化文件大小
+    def format_size(size: int) -> str:
+        if size < 1024:
+            return f"{size} B"
+        elif size < 1024 * 1024:
+            return f"{size / 1024:.1f} KB"
+        elif size < 1024 * 1024 * 1024:
+            return f"{size / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size / (1024 * 1024 * 1024):.2f} GB"
+
+    return {
+        "total_files": total_files,
+        "total_size": total_size,
+        "total_size_readable": format_size(total_size),
+        "file_types": file_types,
+    }

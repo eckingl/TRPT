@@ -11,6 +11,7 @@
           mode="horizontal"
           :ellipsis="false"
           router
+          class="header-menu"
         >
           <el-menu-item index="/">首页</el-menu-item>
           <el-menu-item index="/attribute-process">属性图处理</el-menu-item>
@@ -19,22 +20,37 @@
           <el-menu-item index="/report">报告生成</el-menu-item>
           <el-menu-item index="/data-manage">数据管理</el-menu-item>
         </el-menu>
+        <div class="header-right">
+          <el-tooltip content="AI 配置" placement="bottom">
+            <el-button
+              circle
+              @click="showAISettings = true"
+            >
+              <el-icon><Setting /></el-icon>
+            </el-button>
+          </el-tooltip>
+        </div>
       </el-header>
       <el-main class="app-main">
         <router-view />
       </el-main>
+
+      <!-- AI 配置弹窗 -->
+      <AISettingsDialog v-model="showAISettings" />
     </div>
   </el-config-provider>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Document } from '@element-plus/icons-vue'
+import { Document, Setting } from '@element-plus/icons-vue'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+import AISettingsDialog from '@/components/AISettingsDialog.vue'
 
 const route = useRoute()
 const currentRoute = computed(() => route.path)
+const showAISettings = ref(false)
 </script>
 
 <style>
@@ -88,6 +104,12 @@ body {
 .app-header .el-menu {
   border-bottom: none;
   flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  margin-left: 20px;
 }
 
 .app-main {

@@ -8,17 +8,23 @@
         </div>
       </template>
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :span="4">
           <el-statistic title="地区数量" :value="stats.regions_count" />
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4">
           <el-statistic title="数据记录" :value="stats.data_count" />
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4">
           <el-statistic title="配置数量" :value="stats.config_count" />
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4">
           <el-statistic title="数据库大小" :value="stats.db_size_mb" suffix="MB" />
+        </el-col>
+        <el-col :span="4">
+          <el-statistic title="已上传文件" :value="uploadStats.total_files" />
+        </el-col>
+        <el-col :span="4">
+          <el-statistic title="上传文件大小" :value="uploadStats.total_size_readable" />
         </el-col>
       </el-row>
     </el-card>
@@ -120,6 +126,56 @@
           style="margin-top: 20px"
         />
       </el-tab-pane>
+
+      <!-- 已上传文件管理 -->
+      <el-tab-pane label="已上传文件" name="uploaded-files">
+        <div class="tab-toolbar">
+          <el-input
+            v-model="uploadFileSearch"
+            placeholder="搜索文件名"
+            style="width: 250px"
+            clearable
+            @input="filterUploadedFiles"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-button type="danger" :disabled="selectedUploadedFiles.length === 0" @click="batchDeleteUploadedFiles" style="margin-left: 10px">
+            批量删除 ({{ selectedUploadedFiles.length }})
+          </el-button>
+          <el-button @click="loadUploadedFiles" style="margin-left: auto">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+        </div>
+
+        <el-table :data="filteredUploadedFiles" @selection-change="handleUploadedFileSelectionChange" v-loading="loadingUploadedFiles">
+          <el-table-column type="selection" width="50" />
+          <el-table-column prop="filename" label="文件名" min-width="250" show-overflow-tooltip />
+          <el-table-column label="行数" width="100">
+            <template #default="{ row }">
+              {{ row.rows ? row.rows.toLocaleString() : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="文件大小" width="120">
+            <template #default="{ row }">
+              {{ formatSize(row.size) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="upload_time" label="上传时间" width="180" />
+          <el-table-column label="操作" width="200" fixed="right">
+            <template #default="{ row }">
+              <el-button type="primary" size="small" @click="viewUploadedFileDetail(row)">查看</el-button>
+              <el-button type="danger" size="small" @click="deleteUploadedFile(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="upload-summary">
+          共 {{ uploadedFiles.length }} 个文件，占用空间 {{ uploadStats.total_size_readable }}
+        </div>
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 地区详情对话框 -->
@@ -192,13 +248,57 @@
         <el-button @click="dataDetailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 已上传文件详情对话框 -->
+    <el-dialog v-model="uploadedFileDetailVisible" title="文件详情" width="80%">
+      <el-descriptions :column="3" border v-if="currentUploadedFile">
+        <el-descriptions-item label="文件名">{{ currentUploadedFile.filename }}</el-descriptions-item>
+        <el-descriptions-item label="文件大小">{{ formatSize(currentUploadedFile.size) }}</el-descriptions-item>
+        <el-descriptions-item label="上传时间">{{ currentUploadedFile.upload_time }}</el-descriptions-item>
+        <el-descriptions-item label="数据行数">{{ currentUploadedFile.rows?.toLocaleString() || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="列数">{{ currentUploadedFile.columns?.length || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="文件路径">{{ currentUploadedFile.file_path }}</el-descriptions-item>
+      </el-descriptions>
+
+      <h4 style="margin-top: 20px">列信息</h4>
+      <div class="columns-list" v-if="currentUploadedFile?.columns">
+        <el-tag v-for="col in currentUploadedFile.columns" :key="col" style="margin: 4px">
+          {{ col }}
+        </el-tag>
+      </div>
+
+      <h4 style="margin-top: 20px">数据预览（前10行）</h4>
+      <el-table :data="currentUploadedFile?.preview || []" style="margin-top: 10px" max-height="300">
+        <el-table-column
+          v-for="col in currentUploadedFile?.columns || []"
+          :key="col"
+          :prop="col"
+          :label="col"
+          min-width="120"
+          show-overflow-tooltip
+        />
+      </el-table>
+
+      <template #footer>
+        <el-button type="danger" @click="deleteUploadedFileFromDialog">删除此文件</el-button>
+        <el-button @click="uploadedFileDetailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh } from '@element-plus/icons-vue'
 import axios from 'axios'
+import {
+  getUploadedFiles,
+  getUploadedFileInfo,
+  deleteUploadedFile as apiDeleteUploadedFile,
+  deleteMultipleFiles,
+  getUploadStats
+} from '@/api'
 
 const API_BASE = '/api/data-manage'
 
@@ -208,6 +308,14 @@ const stats = ref({
   data_count: 0,
   config_count: 0,
   db_size_mb: 0
+})
+
+// 上传文件统计
+const uploadStats = ref({
+  total_files: 0,
+  total_size: 0,
+  total_size_readable: '0 B',
+  file_types: {}
 })
 
 // Tab
@@ -241,6 +349,25 @@ const dataDetailVisible = ref(false)
 const currentData = ref(null)
 const currentDataContent = ref('')
 const editingData = ref(false)
+
+// 已上传文件
+const uploadedFiles = ref([])
+const loadingUploadedFiles = ref(false)
+const selectedUploadedFiles = ref([])
+const uploadFileSearch = ref('')
+const uploadedFileDetailVisible = ref(false)
+const currentUploadedFile = ref(null)
+
+// 过滤后的文件列表
+const filteredUploadedFiles = computed(() => {
+  if (!uploadFileSearch.value) {
+    return uploadedFiles.value
+  }
+  const keyword = uploadFileSearch.value.toLowerCase()
+  return uploadedFiles.value.filter(f =>
+    f.filename.toLowerCase().includes(keyword)
+  )
+})
 
 // 加载统计数据
 const loadStats = async () => {
@@ -451,12 +578,114 @@ const handleDataSelectionChange = (selection) => {
   selectedData.value = selection
 }
 
+const handleUploadedFileSelectionChange = (selection) => {
+  selectedUploadedFiles.value = selection
+}
+
 // 格式化大小
 const formatSize = (bytes) => {
   if (!bytes) return '0 B'
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
-  return (bytes / 1024 / 1024).toFixed(2) + ' MB'
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB'
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB'
+}
+
+// ============ 已上传文件管理 ============
+
+// 加载上传文件统计
+const loadUploadStats = async () => {
+  try {
+    const res = await getUploadStats()
+    uploadStats.value = res
+  } catch (err) {
+    console.error('加载上传统计失败:', err)
+  }
+}
+
+// 加载已上传文件列表
+const loadUploadedFiles = async () => {
+  loadingUploadedFiles.value = true
+  try {
+    const res = await getUploadedFiles()
+    uploadedFiles.value = res.files || []
+    loadUploadStats()
+  } catch (err) {
+    ElMessage.error('加载已上传文件列表失败')
+  } finally {
+    loadingUploadedFiles.value = false
+  }
+}
+
+// 搜索过滤
+const filterUploadedFiles = () => {
+  // 搜索由 computed 自动处理
+}
+
+// 查看文件详情
+const viewUploadedFileDetail = async (row) => {
+  try {
+    const res = await getUploadedFileInfo(row.filename)
+    currentUploadedFile.value = res
+    uploadedFileDetailVisible.value = true
+  } catch (err) {
+    ElMessage.error('加载文件详情失败')
+  }
+}
+
+// 删除文件
+const deleteUploadedFile = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确定要删除文件 "${row.filename}" 吗？`, '确认删除', {
+      type: 'warning'
+    })
+    await apiDeleteUploadedFile(row.filename)
+    ElMessage.success('删除成功')
+    loadUploadedFiles()
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '删除失败')
+    }
+  }
+}
+
+// 从对话框删除文件
+const deleteUploadedFileFromDialog = async () => {
+  if (!currentUploadedFile.value) return
+  try {
+    await ElMessageBox.confirm(`确定要删除文件 "${currentUploadedFile.value.filename}" 吗？`, '确认删除', {
+      type: 'warning'
+    })
+    await apiDeleteUploadedFile(currentUploadedFile.value.filename)
+    ElMessage.success('删除成功')
+    uploadedFileDetailVisible.value = false
+    loadUploadedFiles()
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '删除失败')
+    }
+  }
+}
+
+// 批量删除文件
+const batchDeleteUploadedFiles = async () => {
+  try {
+    await ElMessageBox.confirm(`确定要删除选中的 ${selectedUploadedFiles.value.length} 个文件吗？`, '确认删除', {
+      type: 'warning'
+    })
+    const filenames = selectedUploadedFiles.value.map(f => f.filename)
+    const res = await deleteMultipleFiles(filenames)
+    if (res.success) {
+      ElMessage.success(`成功删除 ${res.deleted_count} 个文件`)
+    } else {
+      ElMessage.warning(`成功 ${res.deleted_count} 个，失败 ${res.failed_count} 个`)
+    }
+    loadUploadedFiles()
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '批量删除失败')
+    }
+  }
 }
 
 onMounted(() => {
@@ -464,6 +693,8 @@ onMounted(() => {
   loadRegions()
   loadAllRegions()
   loadProjectData()
+  loadUploadedFiles()
+  loadUploadStats()
 })
 </script>
 
@@ -492,5 +723,23 @@ onMounted(() => {
   margin-bottom: 20px;
   display: flex;
   align-items: center;
+}
+
+.upload-summary {
+  margin-top: 20px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  text-align: center;
+  color: #606266;
+  font-size: 14px;
+}
+
+.columns-list {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 10px;
+  background: #f5f7fa;
+  border-radius: 4px;
 }
 </style>

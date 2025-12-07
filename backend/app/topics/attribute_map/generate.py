@@ -19,7 +19,7 @@ from app.core.chart import (
     make_town_grade_stack_chart,
     set_theme,
 )
-from app.topics.attribute_map.config import SOIL_ATTR_CONFIG
+from app.topics.attribute_map.config import SOIL_ATTR_CONFIG, get_grade_order
 from app.topics.attribute_map.stats import AttributeStats
 
 
@@ -364,9 +364,7 @@ def _add_town_analysis(
 
     # 堆叠图
     if config.include_stack_chart:
-        grade_config = SOIL_ATTR_CONFIG.get(stats.attr_key, {})
-        levels = grade_config.get("levels", [])
-        grade_order = [level[1] for level in levels]
+        grade_order = get_grade_order(stats.attr_key)
 
         doc.add_heading("4.2 乡镇等级分布", level=2)
         stack_chart = make_town_grade_stack_chart(
@@ -1102,9 +1100,7 @@ def _add_town_analysis_section(
         _insert_image(doc, town_chart, config.image_width_mm, "图：各乡镇均值对比")
 
     if config.include_stack_chart:
-        grade_config = SOIL_ATTR_CONFIG.get(stats.attr_key, {})
-        levels = grade_config.get("levels", [])
-        grade_order = [level[1] for level in levels]
+        grade_order = get_grade_order(stats.attr_key)
 
         stack_chart = make_town_grade_stack_chart(
             stats.town_stats,
@@ -1148,9 +1144,7 @@ def _add_ai_town_analysis(
 def _add_town_table(doc: Document, stats: AttributeStats) -> None:
     """添加乡镇统计表"""
     df = stats.town_stats
-    grade_config = SOIL_ATTR_CONFIG.get(stats.attr_key, {})
-    levels = grade_config.get("levels", [])
-    grade_order = [level[1] for level in levels]
+    grade_order = get_grade_order(stats.attr_key)
 
     # 基本表头
     headers = ["乡镇", "样点数", "面积(亩)", "均值"]
@@ -2073,9 +2067,7 @@ def _add_town_analysis_from_excel(doc: Document, stats, config: ReportConfig) ->
         _insert_image(doc, town_chart, config.image_width_mm, "图：各乡镇均值对比")
 
     if config.include_stack_chart:
-        grade_config = SOIL_ATTR_CONFIG.get(stats.attr_key, {})
-        levels = grade_config.get("levels", [])
-        grade_order = [level[1] for level in levels]
+        grade_order = get_grade_order(stats.attr_key)
 
         stack_chart = make_town_grade_stack_chart(
             df,
@@ -2118,9 +2110,7 @@ def _add_ai_town_analysis_from_excel(
 def _add_town_table_from_excel(doc: Document, stats) -> None:
     """添加乡镇统计表（从Excel数据）"""
     df = stats.town_stats
-    grade_config = SOIL_ATTR_CONFIG.get(stats.attr_key, {})
-    levels = grade_config.get("levels", [])
-    grade_order = [level[1] for level in levels]
+    grade_order = get_grade_order(stats.attr_key)
 
     # 基本表头
     headers = ["乡镇", "样点数", "面积(亩)", "均值"]

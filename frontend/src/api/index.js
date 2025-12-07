@@ -98,6 +98,23 @@ export const getUploadedFiles = () => api.get('/upload/files')
 export const getUploadedFileInfo = (filename) => api.get(`/upload/files/${encodeURIComponent(filename)}`)
 
 /**
+ * 删除已上传文件
+ * @param {string} filename - 文件名
+ */
+export const deleteUploadedFile = (filename) => api.delete(`/upload/files/${encodeURIComponent(filename)}`)
+
+/**
+ * 批量删除已上传文件
+ * @param {string[]} filenames - 文件名列表
+ */
+export const deleteMultipleFiles = (filenames) => api.delete('/upload/files', { data: filenames })
+
+/**
+ * 获取上传文件统计
+ */
+export const getUploadStats = () => api.get('/upload/stats')
+
+/**
  * 处理属性图数据
  * @param {string[]} sampleFiles - 样点文件路径列表
  * @param {string[]} areaFiles - 制图文件路径列表
@@ -146,7 +163,7 @@ export const getProcessRecord = (processId) => api.get(`/report/process-records/
  * @param {string} params.ai_provider - AI提供商
  */
 export const generateReportFromProcess = (params) =>
-  api.post('/report/generate-from-process', params, { timeout: 120000 })
+  api.post('/report/generate-from-process', params, { timeout: 300000 })
 
 /**
  * 下载报告文件
@@ -188,5 +205,54 @@ export const updateRegion = (regionId, data) => api.put(`/regions/${regionId}`, 
  * @param {number} regionId - 地区ID
  */
 export const deleteRegion = (regionId) => api.delete(`/regions/${regionId}`)
+
+// ============ AI 配置管理 API ============
+
+/**
+ * 获取所有 AI 配置
+ */
+export const getAIConfigs = () => api.get('/ai-config')
+
+/**
+ * 创建 AI 配置
+ * @param {object} data - 配置数据
+ */
+export const createAIConfig = (data) => api.post('/ai-config', data)
+
+/**
+ * 获取单个 AI 配置
+ * @param {string} configId - 配置ID
+ */
+export const getAIConfig = (configId) => api.get(`/ai-config/${configId}`)
+
+/**
+ * 更新 AI 配置
+ * @param {string} configId - 配置ID
+ * @param {object} data - 更新数据
+ */
+export const updateAIConfig = (configId, data) => api.put(`/ai-config/${configId}`, data)
+
+/**
+ * 删除 AI 配置
+ * @param {string} configId - 配置ID
+ */
+export const deleteAIConfig = (configId) => api.delete(`/ai-config/${configId}`)
+
+/**
+ * 设置默认 AI 配置
+ * @param {string} configId - 配置ID
+ */
+export const setDefaultAIConfig = (configId) => api.post(`/ai-config/${configId}/set-default`)
+
+/**
+ * 测试 AI 配置
+ * @param {string} configId - 配置ID
+ */
+export const testAIConfig = (configId) => api.post(`/ai-config/${configId}/test`)
+
+/**
+ * 获取默认 AI 配置
+ */
+export const getDefaultAIConfig = () => api.get('/ai-config/default/current')
 
 export default api
