@@ -5,6 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  base: './',  // 使用相对路径，支持打包后运行
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
