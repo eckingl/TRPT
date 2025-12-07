@@ -11,6 +11,9 @@ from fastapi.staticfiles import StaticFiles
 from app.api import router as api_router
 from app.config import get_settings
 from app.models import HealthResponse, TopicInfo
+
+# 导入专题模块以触发注册
+from app.topics import attribute_map as _  # noqa: F401
 from app.topics import get_available_topics
 
 

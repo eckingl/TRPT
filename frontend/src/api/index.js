@@ -87,6 +87,17 @@ export const uploadMultipleFiles = (files) => {
 }
 
 /**
+ * 获取已上传文件列表
+ */
+export const getUploadedFiles = () => api.get('/upload/files')
+
+/**
+ * 获取单个已上传文件的详细信息
+ * @param {string} filename - 文件名
+ */
+export const getUploadedFileInfo = (filename) => api.get(`/upload/files/${encodeURIComponent(filename)}`)
+
+/**
  * 处理属性图数据
  * @param {string[]} sampleFiles - 样点文件路径列表
  * @param {string[]} areaFiles - 制图文件路径列表
@@ -110,6 +121,32 @@ export const processMappingData = (areaFiles) =>
  * 获取报告列表
  */
 export const getReportList = () => api.get('/report/list')
+
+/**
+ * 获取处理记录列表
+ */
+export const getProcessRecords = () => api.get('/report/process-records')
+
+/**
+ * 获取单条处理记录详情
+ * @param {string} processId - 处理ID
+ */
+export const getProcessRecord = (processId) => api.get(`/report/process-records/${processId}`)
+
+/**
+ * 基于处理结果生成报告
+ * @param {object} params - 生成参数
+ * @param {string} params.process_id - 处理ID
+ * @param {string[]} params.attributes - 要包含的属性列表
+ * @param {string} params.region_name - 区域名称
+ * @param {number} params.survey_year - 调查年份
+ * @param {string} params.theme - 图表主题
+ * @param {string} params.report_mode - 报告模式: single/multi/both
+ * @param {boolean} params.use_ai - 是否使用AI
+ * @param {string} params.ai_provider - AI提供商
+ */
+export const generateReportFromProcess = (params) =>
+  api.post('/report/generate-from-process', params, { timeout: 120000 })
 
 /**
  * 下载报告文件

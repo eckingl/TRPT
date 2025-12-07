@@ -49,6 +49,15 @@
             <el-tooltip content="包含土壤养分、pH等属性数据的样点统计CSV文件">
               <el-icon class="help-icon"><QuestionFilled /></el-icon>
             </el-tooltip>
+            <el-button
+              type="primary"
+              text
+              class="history-btn"
+              @click="openHistoryFileDialog('sample')"
+            >
+              <el-icon><FolderOpened /></el-icon>
+              选择已有文件
+            </el-button>
           </div>
           <el-upload
             class="upload-area"
@@ -87,6 +96,15 @@
             <el-tooltip content="包含土地利用类型、乡镇、面积等数据的制图统计CSV文件">
               <el-icon class="help-icon"><QuestionFilled /></el-icon>
             </el-tooltip>
+            <el-button
+              type="primary"
+              text
+              class="history-btn"
+              @click="openHistoryFileDialog('area')"
+            >
+              <el-icon><FolderOpened /></el-icon>
+              选择已有文件
+            </el-button>
           </div>
           <el-upload
             class="upload-area"
@@ -149,6 +167,15 @@
             <el-tooltip content="包含土地利用类型、乡镇、面积等数据的制图统计CSV文件">
               <el-icon class="help-icon"><QuestionFilled /></el-icon>
             </el-tooltip>
+            <el-button
+              type="primary"
+              text
+              class="history-btn"
+              @click="openHistoryFileDialog('mapping')"
+            >
+              <el-icon><FolderOpened /></el-icon>
+              选择已有文件
+            </el-button>
           </div>
           <el-upload
             class="upload-area"
@@ -199,34 +226,266 @@
       <template #header>
         <div class="card-header">
           <span>处理结果</span>
+          <el-tag v-if="processResult.success" type="success">成功</el-tag>
+          <el-tag v-else type="danger">失败</el-tag>
         </div>
       </template>
-      <el-result
-        :icon="processResult.success ? 'success' : 'error'"
-        :title="processResult.success ? '处理完成' : '处理失败'"
-        :sub-title="processResult.message"
-      >
-        <template #extra>
-          <el-button
-            v-if="processResult.success && processResult.download_url"
-            type="primary"
-            @click="downloadResult"
-          >
+
+      <div v-if="!processResult.success" class="error-message">
+        <el-alert :title="processResult.message" type="error" show-icon :closable="false" />
+      </div>
+
+      <div v-else>
+        <!-- 下载Excel按钮 -->
+        <div class="action-bar">
+          <el-button type="success" @click="downloadResult">
             <el-icon><Download /></el-icon>
-            下载结果文件
+            下载 Excel 统计表
           </el-button>
           <el-button @click="clearResult">
-            继续处理
+            重新处理
           </el-button>
-        </template>
-      </el-result>
+        </div>
+
+        <!-- 数据预览 -->
+        <div v-if="processResult.preview && processResult.preview.length > 0" class="preview-section">
+          <h3>数据预览</h3>
+          <el-table :data="processResult.preview" stripe border>
+            <el-table-column prop="name" label="属性名称" width="140" />
+            <el-table-column prop="unit" label="单位" width="80" />
+            <el-table-column prop="sample_count" label="样点数" width="80" />
+            <el-table-column label="均值" width="100">
+              <template #default="{ row }">
+                {{ row.sample_mean }} {{ row.unit }}
+              </template>
+            </el-table-column>
+            <el-table-column label="范围" width="150">
+              <template #default="{ row }">
+                {{ row.sample_min }} ~ {{ row.sample_max }}
+              </template>
+            </el-table-column>
+            <el-table-column label="等级分布" min-width="200">
+              <template #default="{ row }">
+                <div class="grade-distribution">
+                  <span
+                    v-for="(pct, grade) in row.grade_distribution"
+                    :key="grade"
+                    class="grade-item"
+                  >
+                    {{ grade }}: {{ pct }}%
+                  </span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="选择" width="60" v-if="showReportForm">
+              <template #default="{ row }">
+                <el-checkbox
+                  v-model="selectedAttributes"
+                  :value="row.key"
+                />
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <!-- 报告生成配置 -->
+        <div class="report-section">
+          <div class="section-header" @click="showReportForm = !showReportForm">
+            <h3>
+              <el-icon><Document /></el-icon>
+              生成 Word 分析报告
+            </h3>
+            <el-icon>
+              <ArrowDown v-if="!showReportForm" />
+              <ArrowUp v-else />
+            </el-icon>
+          </div>
+
+          <el-collapse-transition>
+            <div v-show="showReportForm" class="report-form">
+              <el-form :model="reportConfig" label-width="100px">
+                <el-row :gutter="20">
+                  <el-col :span="12">
+                    <el-form-item label="选择地区" required>
+                      <el-select
+                        v-model="reportConfig.region_id"
+                        style="width: 100%"
+                        placeholder="请选择地区"
+                        filterable
+                        @change="onRegionChange"
+                      >
+                        <el-option
+                          v-for="region in regions"
+                          :key="region.id"
+                          :label="region.name"
+                          :value="region.id"
+                        />
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="调查年份">
+                      <el-input-number v-model="reportConfig.survey_year" :min="2000" :max="2030" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+                <el-row v-if="!reportConfig.region_id" :gutter="20">
+                  <el-col :span="24">
+                    <el-form-item label="或输入地区">
+                      <el-input v-model="reportConfig.region_name" placeholder="如：濮阳县（未选择地区时使用）" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-row :gutter="20">
+                  <el-col :span="12">
+                    <el-form-item label="报告模式">
+                      <el-select v-model="reportConfig.report_mode" style="width: 100%" @change="onReportModeChange">
+                        <el-option label="综合报告（所有属性）" value="multi" />
+                        <el-option label="单属性报告" value="single" />
+                        <el-option label="两者都生成" value="both" />
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="图表主题">
+                      <el-select v-model="reportConfig.theme" style="width: 100%">
+                        <el-option label="专业蓝" value="professional" />
+                        <el-option label="大地色" value="earth" />
+                        <el-option label="活力橙" value="vibrant" />
+                        <el-option label="默认" value="default" />
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <!-- 单属性模式下选择具体属性 -->
+                <el-row v-if="reportConfig.report_mode === 'single'" :gutter="20">
+                  <el-col :span="24">
+                    <el-form-item label="选择属性" required>
+                      <el-select
+                        v-model="selectedSingleAttribute"
+                        style="width: 100%"
+                        placeholder="请选择要生成报告的属性"
+                      >
+                        <el-option
+                          v-for="attr in currentPreviewList"
+                          :key="attr.key"
+                          :label="`${attr.name} (${attr.unit}) - 均值: ${attr.sample_mean}`"
+                          :value="attr.key"
+                        />
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-row :gutter="20">
+                  <el-col :span="12">
+                    <el-form-item label="AI 分析">
+                      <el-switch v-model="reportConfig.use_ai" />
+                      <span v-if="reportConfig.use_ai" class="ai-hint">将调用 AI 生成专业分析文字</span>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12" v-if="reportConfig.use_ai">
+                    <el-form-item label="AI 提供商">
+                      <el-select v-model="reportConfig.ai_provider" style="width: 100%">
+                        <el-option label="DeepSeek" value="deepseek" />
+                        <el-option label="通义千问" value="qwen" />
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-form-item>
+                  <el-button
+                    type="primary"
+                    size="large"
+                    :loading="generatingReport"
+                    @click="generateWordReport"
+                  >
+                    <el-icon><Document /></el-icon>
+                    生成 Word 报告
+                  </el-button>
+                </el-form-item>
+              </el-form>
+            </div>
+          </el-collapse-transition>
+        </div>
+
+        <!-- 报告生成结果 -->
+        <div v-if="reportResult" class="report-result">
+          <el-result
+            :icon="reportResult.success ? 'success' : 'error'"
+            :title="reportResult.success ? '报告生成成功' : '报告生成失败'"
+            :sub-title="reportResult.message"
+          >
+            <template #extra>
+              <el-button
+                v-if="reportResult.success && reportResult.download_url"
+                type="primary"
+                @click="downloadWordReport"
+              >
+                <el-icon><Download /></el-icon>
+                下载 Word 报告
+              </el-button>
+            </template>
+          </el-result>
+        </div>
+      </div>
     </el-card>
 
-    <!-- 历史记录 -->
+    <!-- 历史处理记录 -->
     <el-card class="history-card">
       <template #header>
         <div class="card-header">
-          <span>历史记录</span>
+          <span>历史处理记录</span>
+          <el-button text @click="refreshProcessRecords">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+        </div>
+      </template>
+      <div v-if="processRecords.length > 0" class="history-list">
+        <el-table :data="processRecords" stripe>
+          <el-table-column label="处理时间" width="170">
+            <template #default="{ row }">
+              {{ formatTime(row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="数据文件" min-width="180">
+            <template #default="{ row }">
+              <div class="file-names">
+                <span v-for="f in row.sample_files.slice(0, 2)" :key="f" class="file-tag">{{ f }}</span>
+                <span v-if="row.sample_files.length > 2" class="more-tag">+{{ row.sample_files.length - 2 }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="属性数量" width="90">
+            <template #default="{ row }">
+              {{ row.preview?.length || 0 }} 个
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="160" fixed="right">
+            <template #default="{ row }">
+              <el-button type="primary" link @click="selectProcessRecord(row)">
+                <el-icon><Document /></el-icon>
+                生成报告
+              </el-button>
+              <el-button type="success" link @click="downloadFile(`/api/report/download/${encodeURIComponent(row.excel_filename)}`)">
+                <el-icon><Download /></el-icon>
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <el-empty v-else description="暂无处理记录" />
+    </el-card>
+
+    <!-- 文件下载历史 -->
+    <el-card class="history-card">
+      <template #header>
+        <div class="card-header">
+          <span>文件下载</span>
           <el-button text @click="refreshHistory">
             <el-icon><Refresh /></el-icon>
             刷新
@@ -256,7 +515,7 @@
           </el-table-column>
         </el-table>
       </div>
-      <el-empty v-else description="暂无历史记录" />
+      <el-empty v-else description="暂无文件" />
     </el-card>
 
     <div class="page-actions">
@@ -265,11 +524,62 @@
         返回首页
       </el-button>
     </div>
+
+    <!-- 历史文件选择对话框 -->
+    <el-dialog
+      v-model="showHistoryFileDialog"
+      title="选择已上传的文件"
+      width="700px"
+      :close-on-click-modal="false"
+    >
+      <div v-loading="loadingHistoryFiles" class="history-file-content">
+        <el-alert
+          v-if="historyFiles.length === 0 && !loadingHistoryFiles"
+          title="暂无已上传的文件"
+          type="info"
+          show-icon
+          :closable="false"
+        />
+        <el-table
+          v-else
+          :data="historyFiles"
+          stripe
+          max-height="400px"
+          @selection-change="(rows) => selectedHistoryFiles = rows.map(r => r.filename)"
+        >
+          <el-table-column type="selection" width="50" />
+          <el-table-column prop="filename" label="文件名" min-width="200" show-overflow-tooltip />
+          <el-table-column label="行数" width="80">
+            <template #default="{ row }">
+              {{ row.rows || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="大小" width="100">
+            <template #default="{ row }">
+              {{ formatFileSize(row.size) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="upload_time" label="上传时间" width="170" />
+        </el-table>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showHistoryFileDialog = false">取消</el-button>
+          <el-button
+            type="primary"
+            :disabled="selectedHistoryFiles.length === 0"
+            @click="confirmSelectHistoryFiles"
+          >
+            确认选择 ({{ selectedHistoryFiles.length }})
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   DataAnalysis,
   MapLocation,
@@ -280,20 +590,55 @@ import {
   VideoPlay,
   Download,
   Refresh,
-  ArrowLeft
+  ArrowLeft,
+  ArrowDown,
+  ArrowUp,
+  FolderOpened
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
   uploadFile as apiUploadFile,
   processAttributeData as apiProcessAttributeData,
   processMappingData as apiProcessMappingData,
-  getReportList
+  getReportList,
+  generateReportFromProcess,
+  getProcessRecords,
+  getRegions,
+  getUploadedFiles,
+  getUploadedFileInfo
 } from '@/api'
 
 const currentFunction = ref('attribute')
 const processing = ref(false)
 const processResult = ref(null)
 const reportList = ref([])
+
+// 地区列表
+const regions = ref([])
+
+// 历史处理记录
+const processRecords = ref([])
+
+// 报告生成相关
+const showReportForm = ref(false)
+const generatingReport = ref(false)
+const reportResult = ref(null)
+const selectedAttributes = ref([])
+const selectedSingleAttribute = ref('')  // 单属性模式下选中的属性
+const reportConfig = ref({
+  region_id: null,
+  region_name: '',
+  survey_year: 2024,
+  report_mode: 'multi',
+  theme: 'professional',
+  use_ai: false,
+  ai_provider: 'deepseek'
+})
+
+// 当前预览数据列表（用于单属性选择）
+const currentPreviewList = computed(() => {
+  return processResult.value?.preview || []
+})
 
 // 属性图数据处理的文件
 const sampleFiles = ref([])
@@ -304,6 +649,13 @@ const uploadedAreaFiles = ref([])
 // 属性图上图处理的文件
 const mappingFiles = ref([])
 const uploadedMappingFiles = ref([])
+
+// 历史文件选择对话框
+const showHistoryFileDialog = ref(false)
+const historyFiles = ref([])
+const loadingHistoryFiles = ref(false)
+const selectedHistoryFiles = ref([])
+const historyFileTarget = ref('')  // 'sample' | 'area' | 'mapping'
 
 const selectFunction = (func) => {
   currentFunction.value = func
@@ -367,6 +719,80 @@ const removeAreaFile = (index) => {
 
 const removeMappingFile = (index) => {
   uploadedMappingFiles.value.splice(index, 1)
+}
+
+// 打开历史文件选择对话框
+const openHistoryFileDialog = async (target) => {
+  historyFileTarget.value = target
+  selectedHistoryFiles.value = []
+  showHistoryFileDialog.value = true
+  loadingHistoryFiles.value = true
+
+  try {
+    const response = await getUploadedFiles()
+    historyFiles.value = response.files || []
+  } catch (error) {
+    ElMessage.error('获取历史文件列表失败')
+    historyFiles.value = []
+  } finally {
+    loadingHistoryFiles.value = false
+  }
+}
+
+// 确认选择历史文件
+const confirmSelectHistoryFiles = async () => {
+  if (selectedHistoryFiles.value.length === 0) {
+    ElMessage.warning('请至少选择一个文件')
+    return
+  }
+
+  // 获取选中文件的详细信息
+  for (const filename of selectedHistoryFiles.value) {
+    try {
+      const fileInfo = await getUploadedFileInfo(filename)
+
+      // 检查是否已存在
+      const targetList = getTargetFileList()
+      const exists = targetList.some(f => f.file_path === fileInfo.file_path)
+      if (exists) {
+        ElMessage.warning(`文件 ${filename} 已添加`)
+        continue
+      }
+
+      // 添加到对应的文件列表
+      if (historyFileTarget.value === 'sample') {
+        uploadedSampleFiles.value.push(fileInfo)
+      } else if (historyFileTarget.value === 'area') {
+        uploadedAreaFiles.value.push(fileInfo)
+      } else if (historyFileTarget.value === 'mapping') {
+        uploadedMappingFiles.value.push(fileInfo)
+      }
+    } catch (error) {
+      ElMessage.error(`获取文件 ${filename} 信息失败`)
+    }
+  }
+
+  showHistoryFileDialog.value = false
+  ElMessage.success(`已添加 ${selectedHistoryFiles.value.length} 个文件`)
+}
+
+// 获取目标文件列表
+const getTargetFileList = () => {
+  if (historyFileTarget.value === 'sample') {
+    return uploadedSampleFiles.value
+  } else if (historyFileTarget.value === 'area') {
+    return uploadedAreaFiles.value
+  } else if (historyFileTarget.value === 'mapping') {
+    return uploadedMappingFiles.value
+  }
+  return []
+}
+
+// 格式化文件大小（用于历史文件列表）
+const formatFileSize = (bytes) => {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 // 执行属性图数据处理
@@ -443,6 +869,87 @@ const downloadFile = (url) => {
 // 清除结果
 const clearResult = () => {
   processResult.value = null
+  reportResult.value = null
+  showReportForm.value = false
+  selectedAttributes.value = []
+}
+
+// 生成 Word 报告
+const generateWordReport = async () => {
+  if (!processResult.value?.process_id) {
+    ElMessage.warning('请先处理数据')
+    return
+  }
+
+  // 必须选择地区或输入地区名称
+  if (!reportConfig.value.region_id && !reportConfig.value.region_name) {
+    ElMessage.warning('请选择地区或输入地区名称')
+    return
+  }
+
+  // 单属性模式下必须选择一个属性
+  if (reportConfig.value.report_mode === 'single' && !selectedSingleAttribute.value) {
+    ElMessage.warning('请选择要生成报告的属性')
+    return
+  }
+
+  generatingReport.value = true
+  reportResult.value = null
+
+  try {
+    // 确定地区名称
+    let regionName = reportConfig.value.region_name
+    if (reportConfig.value.region_id) {
+      const region = regions.value.find(r => r.id === reportConfig.value.region_id)
+      if (region) {
+        regionName = region.name
+      }
+    }
+
+    // 确定要包含的属性列表
+    let attributesToInclude = null
+    if (reportConfig.value.report_mode === 'single') {
+      // 单属性模式：只包含选中的单个属性
+      attributesToInclude = [selectedSingleAttribute.value]
+    } else if (selectedAttributes.value.length > 0) {
+      // 其他模式：使用多选的属性（如果有）
+      attributesToInclude = selectedAttributes.value
+    }
+
+    const params = {
+      process_id: processResult.value.process_id,
+      region_name: regionName || 'XX县',
+      survey_year: reportConfig.value.survey_year,
+      theme: reportConfig.value.theme,
+      report_mode: reportConfig.value.report_mode,
+      use_ai: reportConfig.value.use_ai,
+      ai_provider: reportConfig.value.use_ai ? reportConfig.value.ai_provider : null,
+      attributes: attributesToInclude
+    }
+
+    const result = await generateReportFromProcess(params)
+    reportResult.value = result
+
+    if (result.success) {
+      ElMessage.success('报告生成成功')
+      refreshHistory()
+    }
+  } catch (error) {
+    reportResult.value = {
+      success: false,
+      message: error.message || '报告生成失败'
+    }
+    ElMessage.error(error.message || '报告生成失败')
+  } finally {
+    generatingReport.value = false
+  }
+}
+
+// 下载 Word 报告
+const downloadWordReport = () => {
+  if (reportResult.value?.download_url) {
+    window.open(reportResult.value.download_url, '_blank')
+  }
 }
 
 // 刷新历史记录
@@ -451,6 +958,57 @@ const refreshHistory = async () => {
     reportList.value = await getReportList()
   } catch (error) {
     console.error('获取历史记录失败:', error)
+  }
+}
+
+// 刷新处理记录
+const refreshProcessRecords = async () => {
+  try {
+    processRecords.value = await getProcessRecords()
+  } catch (error) {
+    console.error('获取处理记录失败:', error)
+  }
+}
+
+// 选择历史处理记录
+const selectProcessRecord = (record) => {
+  // 设置处理结果，使其可以生成报告
+  processResult.value = {
+    success: true,
+    process_id: record.process_id,
+    preview: record.preview,
+    download_url: `/api/report/download/${encodeURIComponent(record.excel_filename)}`,
+    message: `已加载历史记录: ${record.created_at}`
+  }
+  // 展开报告生成表单
+  showReportForm.value = true
+  // 重置选择
+  selectedAttributes.value = []
+  selectedSingleAttribute.value = ''
+  reportResult.value = null
+  ElMessage.success('已加载历史处理记录，请配置报告参数')
+}
+
+// 报告模式变化时重置单属性选择
+const onReportModeChange = () => {
+  selectedSingleAttribute.value = ''
+}
+
+// 地区选择变化
+const onRegionChange = (regionId) => {
+  const region = regions.value.find(r => r.id === regionId)
+  if (region) {
+    reportConfig.value.region_name = region.name
+  }
+}
+
+// 加载地区列表
+const loadRegions = async () => {
+  try {
+    const response = await getRegions()
+    regions.value = response.regions || []
+  } catch (error) {
+    console.error('获取地区列表失败:', error)
   }
 }
 
@@ -469,7 +1027,9 @@ const formatTime = (isoString) => {
 }
 
 onMounted(() => {
+  loadRegions()
   refreshHistory()
+  refreshProcessRecords()
 })
 </script>
 
@@ -644,6 +1204,88 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.error-message {
+  padding: 20px 0;
+}
+
+.action-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+/* 数据预览 */
+.preview-section {
+  margin: 20px 0;
+}
+
+.preview-section h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: #303133;
+}
+
+.grade-distribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.grade-item {
+  background: #f0f2f5;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #606266;
+}
+
+/* 报告生成区域 */
+.report-section {
+  margin-top: 20px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #f5f7fa;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.section-header:hover {
+  background: #ebeef5;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-form {
+  padding: 20px;
+  background: #fff;
+}
+
+.ai-hint {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.report-result {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
+}
+
 /* 历史记录卡片 */
 .history-card {
   margin-bottom: 20px;
@@ -654,9 +1296,46 @@ onMounted(() => {
   overflow: auto;
 }
 
+/* 文件名标签 */
+.file-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.file-tag {
+  background: #f0f2f5;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #606266;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-tag {
+  background: #e6f7ff;
+  color: #1890ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
 /* 页面操作 */
 .page-actions {
   margin-top: 20px;
+}
+
+/* 历史文件按钮 */
+.history-btn {
+  margin-left: auto;
+}
+
+/* 历史文件对话框 */
+.history-file-content {
+  min-height: 200px;
 }
 
 /* 响应式 */

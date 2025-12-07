@@ -26,7 +26,14 @@
       "Bash(tasklist:*)",
       "Bash(cmd.exe /c \"taskkill /F /FI \"\"IMAGENAME eq python.exe\"\" /FI \"\"WINDOWTITLE ne Administrator*\"\" 2>nul\")",
       "Bash(python -m ruff check:*)",
-      "Bash(python -m ruff format:*)"
+      "Bash(python -m ruff format:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(pip show:*)",
+      "Bash(python test_ai_report.py:*)",
+      "Bash(python -m py_compile:*)"
     ],
     "deny": [],
     "ask": []

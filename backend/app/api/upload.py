@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from pydantic import BaseModel
 
 from app.config import get_settings
 from app.core.data import load_csv
@@ -13,6 +14,24 @@ from app.models import FileUploadResponse
 
 router = APIRouter()
 settings = get_settings()
+
+
+class UploadedFileInfo(BaseModel):
+    """已上传文件信息"""
+
+    filename: str
+    file_path: str
+    size: int
+    upload_time: str
+    rows: int | None = None
+    columns: list[str] | None = None
+
+
+class UploadedFilesResponse(BaseModel):
+    """已上传文件列表响应"""
+
+    files: list[UploadedFileInfo]
+    total: int
 
 
 def get_file_extension(filename: str) -> str:
@@ -133,3 +152,114 @@ async def upload_multiple_files(
         responses.append(response)
 
     return responses
+
+
+@router.get("/upload/files", response_model=UploadedFilesResponse)
+async def list_uploaded_files() -> UploadedFilesResponse:
+    """获取已上传文件列表
+
+    Returns:
+        已上传文件列表
+    """
+    files: list[UploadedFileInfo] = []
+
+    if not settings.UPLOAD_DIR.exists():
+        return UploadedFilesResponse(files=[], total=0)
+
+    for file_path in settings.UPLOAD_DIR.iterdir():
+        if not file_path.is_file():
+            continue
+
+        ext = get_file_extension(file_path.name)
+        if ext not in settings.ALLOWED_EXTENSIONS:
+            continue
+
+        # 获取文件信息
+        stat = file_path.stat()
+        upload_time = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+
+        # 尝试读取文件获取行数和列信息
+        rows = None
+        columns = None
+        try:
+            if ext == ".csv":
+                df = load_csv(file_path)
+            else:
+                import pandas as pd
+
+                df = pd.read_excel(file_path)
+            rows = len(df)
+            columns = df.columns.tolist()
+        except Exception:
+            pass
+
+        files.append(
+            UploadedFileInfo(
+                filename=file_path.name,
+                file_path=str(file_path),
+                size=stat.st_size,
+                upload_time=upload_time,
+                rows=rows,
+                columns=columns,
+            )
+        )
+
+    # 按上传时间倒序排序
+    files.sort(key=lambda x: x.upload_time, reverse=True)
+
+    return UploadedFilesResponse(files=files, total=len(files))
+
+
+@router.get("/upload/files/{filename}", response_model=FileUploadResponse)
+async def get_uploaded_file_info(filename: str) -> FileUploadResponse:
+    """获取单个已上传文件的详细信息
+
+    Args:
+        filename: 文件名
+
+    Returns:
+        文件详细信息，包含数据预览
+    """
+    file_path = settings.UPLOAD_DIR / filename
+
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"文件不存在: {filename}",
+        )
+
+    ext = get_file_extension(filename)
+    if ext not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不支持的文件类型: {ext}",
+        )
+
+    try:
+        if ext == ".csv":
+            df = load_csv(file_path)
+        else:
+            import pandas as pd
+
+            df = pd.read_excel(file_path)
+
+        columns = df.columns.tolist()
+        rows = len(df)
+
+        # 数据预览（前10行）
+        preview_df = df.head(10)
+        preview = preview_df.to_dict(orient="records")
+
+        return FileUploadResponse(
+            filename=filename,
+            file_path=str(file_path),
+            rows=rows,
+            columns=columns,
+            preview=preview,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"文件读取失败: {str(e)}",
+        )
