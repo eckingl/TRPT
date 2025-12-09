@@ -5,8 +5,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import router as api_router
@@ -99,7 +100,24 @@ def create_app() -> FastAPI:
     frontend_dist = get_frontend_dist_path()
     if frontend_dist:
         print(f"[静态文件] 挂载目录: {frontend_dist}")
-        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
+
+        # 挂载静态资源目录
+        assets_dir = frontend_dist / "assets"
+        if assets_dir.exists():
+            app.mount(
+                "/assets", StaticFiles(directory=assets_dir), name="static_assets"
+            )
+
+        # SPA 路由回退：所有非 API 路由都返回 index.html
+        @app.get("/{full_path:path}")
+        async def serve_spa(request: Request, full_path: str) -> FileResponse:
+            """处理前端 SPA 路由"""
+            # 检查是否是静态文件请求
+            file_path = frontend_dist / full_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+            # 否则返回 index.html（SPA 路由回退）
+            return FileResponse(frontend_dist / "index.html")
     else:
         print("[静态文件] 未找到前端构建产物，请先运行 npm run build")
 

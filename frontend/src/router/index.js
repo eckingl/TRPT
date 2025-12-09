@@ -39,6 +39,12 @@ const routes = [
     name: 'DataManage',
     component: () => import('@/views/DataManageView.vue'),
     meta: { title: '数据管理' }
+  },
+  {
+    path: '/data-report',
+    name: 'DataReport',
+    component: () => import('@/views/DataReport.vue'),
+    meta: { title: '数据报告' }
   }
 ]
 

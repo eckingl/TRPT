@@ -15,6 +15,7 @@ from app.models import (
     ReportGenerateResponse,
 )
 from app.topics.attribute_map import process_attribute_data, process_mapping_data
+from app.topics.data_report import process_data_report
 from app.topics.attribute_map.config import (
     SOIL_ATTR_CONFIG,
     detect_available_attributes,
@@ -866,4 +867,91 @@ async def download_report(report_id: str) -> FileResponse:
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="报告下载功能将在 P4 阶段实现",
+    )
+
+
+class DataReportRequest(BaseModel):
+    """数据报告生成请求"""
+
+    mapping_files: list[str] = Field(
+        default_factory=list, description="制图数据文件路径列表（用于表1-3）"
+    )
+    sample_files: list[str] = Field(
+        default_factory=list, description="样点数据文件路径列表（用于表4-9）"
+    )
+
+
+@router.post("/data-report", response_model=ProcessResponse)
+async def generate_data_report(request: DataReportRequest) -> ProcessResponse:
+    """生成数据报告（9张统计表）
+
+    基于制图数据和样点数据生成包含以下统计表的Excel报告：
+    1. 分乡镇统计
+    2. 土地利用类型统计
+    3. 土壤类型统计
+    4. 样点统计
+    5. 分行政区样点统计
+    6. 土地利用类型样点统计
+    7. 土壤类型样点统计
+    8. 全域属性统计汇总
+    9. 全域属性百分位数统计
+
+    Args:
+        request: 包含制图数据和样点数据文件路径的请求
+
+    Returns:
+        处理结果，包含下载链接
+    """
+    # 打印接收到的参数
+    print(f"[数据报告] 接收到请求:")
+    print(f"  制图文件: {request.mapping_files}")
+    print(f"  样点文件: {request.sample_files}")
+
+    # 至少需要一种数据
+    if not request.mapping_files and not request.sample_files:
+        return ProcessResponse(
+            success=False,
+            message="请至少选择制图数据或样点数据文件",
+        )
+
+    # 验证文件是否存在
+    for file_path in request.mapping_files:
+        if not Path(file_path).exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"制图文件不存在: {file_path}",
+            )
+
+    for file_path in request.sample_files:
+        if not Path(file_path).exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"样点文件不存在: {file_path}",
+            )
+
+    # 处理数据
+    success, result = process_data_report(
+        mapping_paths=request.mapping_files if request.mapping_files else None,
+        sample_paths=request.sample_files if request.sample_files else None,
+    )
+
+    if not success:
+        return ProcessResponse(
+            success=False,
+            message=f"处理失败: {result}",
+        )
+
+    # 保存结果文件
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_filename = f"数据报告_{timestamp}.xlsx"
+    output_path = settings.OUTPUT_DIR / output_filename
+
+    with open(output_path, "wb") as f:
+        f.write(result)
+
+    return ProcessResponse(
+        success=True,
+        message="数据报告生成成功",
+        download_url=f"/api/report/download/{quote(output_filename)}",
+        filename=output_filename,
     )

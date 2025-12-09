@@ -1,6 +1,7 @@
 """AI 客户端模块
 
 支持通义千问和 DeepSeek 两种 AI 接口
+集成 Memori 记忆引擎提供跨会话上下文记忆
 """
 
 import os
@@ -9,8 +10,16 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
+from app.core.ai.memory import enable_memori, is_memori_enabled
+
 # 加载环境变量
 load_dotenv()
+
+# 尝试在模块加载时初始化 Memori（可选，不影响主功能）
+try:
+    _memori_init_result = enable_memori()
+except Exception:
+    _memori_init_result = False
 
 
 class AIProvider(Enum):

@@ -19,20 +19,20 @@ class Database:
     async def init_db(self) -> None:
         """初始化数据库表"""
         async with aiosqlite.connect(self.db_path) as db:
-            # 地区项目表
+            # 地区项目表 - 地区按大类共享，不再绑定到具体专题
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS regions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     category TEXT NOT NULL,
-                    topic TEXT NOT NULL,
-                    item TEXT NOT NULL,
+                    topic TEXT,
+                    item TEXT,
                     province TEXT,
                     city TEXT,
                     county TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    UNIQUE(name, category, topic, item)
+                    UNIQUE(name, category)
                 )
             """)
 
@@ -67,8 +67,8 @@ class Database:
         self,
         name: str,
         category: str,
-        topic: str,
-        item: str,
+        topic: str | None = None,
+        item: str | None = None,
         province: str | None = None,
         city: str | None = None,
         county: str | None = None,
@@ -78,8 +78,8 @@ class Database:
         Args:
             name: 地区名称
             category: 大类
-            topic: 专题
-            item: 具体项目
+            topic: 专题（可选，用于兼容旧数据）
+            item: 具体项目（可选，用于兼容旧数据）
             province: 省份代码
             city: 市代码
             county: 县/区名称

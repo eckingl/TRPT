@@ -8,6 +8,11 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
+from app.core.ai.memory import (
+    disable_memori,
+    enable_memori,
+    is_memori_enabled,
+)
 
 router = APIRouter(prefix="/ai-config")
 settings = get_settings()
@@ -331,3 +336,35 @@ async def get_default_config() -> dict:
             }
 
     return {"has_default": False, "config": None}
+
+
+# ==================== Memori 记忆功能 API ====================
+
+
+@router.get("/memori/status")
+async def get_memori_status() -> dict:
+    """获取 Memori 记忆功能状态"""
+    return {
+        "enabled": is_memori_enabled(),
+        "message": "Memori 记忆功能已启用" if is_memori_enabled() else "Memori 记忆功能未启用",
+    }
+
+
+@router.post("/memori/enable")
+async def enable_memori_api() -> dict:
+    """启用 Memori 记忆功能"""
+    success = enable_memori()
+    if success:
+        return {"success": True, "message": "Memori 记忆功能已启用"}
+    else:
+        return {
+            "success": False,
+            "message": "Memori 启用失败，请检查 memorisdk 是否安装及 API Key 配置",
+        }
+
+
+@router.post("/memori/disable")
+async def disable_memori_api() -> dict:
+    """禁用 Memori 记忆功能"""
+    disable_memori()
+    return {"success": True, "message": "Memori 记忆功能已禁用"}

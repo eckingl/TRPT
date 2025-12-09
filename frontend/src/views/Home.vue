@@ -52,8 +52,8 @@
         </div>
       </div>
 
-      <!-- 第三级：地区选择/新建 -->
-      <div v-if="selectedTopic" class="level-section">
+      <!-- 第三级：地区选择/新建 - 地区按大类共享 -->
+      <div v-if="selectedCategory" class="level-section">
         <div class="level-title">
           <span class="level-number">3</span>
           <span>选择或新建地区</span>
@@ -95,15 +95,15 @@
         </div>
       </div>
 
-      <!-- 第四级：具体操作 -->
-      <div v-if="selectedRegion" class="level-section">
+      <!-- 第四级：具体操作 - 需要同时选择专题和地区 -->
+      <div v-if="selectedTopic && selectedRegion" class="level-section">
         <div class="level-title">
           <span class="level-number">4</span>
           <span>选择操作</span>
         </div>
         <div class="card-grid">
           <div
-            v-for="action in actions"
+            v-for="action in currentActions"
             :key="action.id"
             class="selection-card action-card"
             @click="handleAction(action.id)"
@@ -389,6 +389,12 @@ const topics = {
       name: '适宜性评价',
       description: '作物适宜性分析',
       icon: TrendCharts
+    },
+    {
+      id: 'data_report',
+      name: '数据报告',
+      description: '生成数据统计Excel报告',
+      icon: Document
     }
   ],
   land_quality: [
@@ -401,39 +407,125 @@ const topics = {
   ]
 }
 
-// 操作列表
-const actions = [
-  {
-    id: 'attribute-process',
-    name: '属性图数据处理',
-    description: '处理样点和制图统计数据',
-    icon: DataAnalysis
-  },
-  {
-    id: 'upload',
-    name: '上传数据',
-    description: '上传或更新数据文件',
-    icon: Upload
-  },
-  {
-    id: 'config',
-    name: '配置参数',
-    description: '设置分级标准等参数',
-    icon: Setting
-  },
-  {
-    id: 'preview',
-    name: '预览数据',
-    description: '查看已上传的数据',
-    icon: View
-  },
-  {
-    id: 'generate',
-    name: '生成报告',
-    description: '生成Word报告文档',
-    icon: DocIcon
-  }
-]
+// 各专题的操作列表
+const topicActions = {
+  // 属性图专题操作
+  attribute_map: [
+    {
+      id: 'attribute-process',
+      name: '数据处理',
+      description: '处理样点和制图统计数据',
+      icon: DataAnalysis
+    },
+    {
+      id: 'upload',
+      name: '上传数据',
+      description: '上传或更新数据文件',
+      icon: Upload
+    },
+    {
+      id: 'config',
+      name: '配置参数',
+      description: '设置分级标准等参数',
+      icon: Setting
+    },
+    {
+      id: 'generate',
+      name: '生成报告',
+      description: '生成Word报告文档',
+      icon: DocIcon
+    }
+  ],
+  // 类型图专题操作
+  type_map: [
+    {
+      id: 'upload',
+      name: '上传数据',
+      description: '上传或更新数据文件',
+      icon: Upload
+    },
+    {
+      id: 'config',
+      name: '配置参数',
+      description: '设置配置参数',
+      icon: Setting
+    },
+    {
+      id: 'generate',
+      name: '生成报告',
+      description: '生成Word报告文档',
+      icon: DocIcon
+    }
+  ],
+  // 适宜性评价专题操作
+  suitability: [
+    {
+      id: 'upload',
+      name: '上传数据',
+      description: '上传或更新数据文件',
+      icon: Upload
+    },
+    {
+      id: 'config',
+      name: '配置参数',
+      description: '设置评价参数',
+      icon: Setting
+    },
+    {
+      id: 'generate',
+      name: '生成报告',
+      description: '生成评价报告',
+      icon: DocIcon
+    }
+  ],
+  // 数据报告专题操作
+  data_report: [
+    {
+      id: 'data-report',
+      name: '生成数据报告',
+      description: '生成数据统计Excel报告',
+      icon: Grid
+    },
+    {
+      id: 'upload',
+      name: '上传数据',
+      description: '上传或更新数据文件',
+      icon: Upload
+    },
+    {
+      id: 'config',
+      name: '配置参数',
+      description: '设置统计配置参数',
+      icon: Setting
+    }
+  ],
+  // 等级评价专题操作
+  grade_eval: [
+    {
+      id: 'upload',
+      name: '上传数据',
+      description: '上传或更新数据文件',
+      icon: Upload
+    },
+    {
+      id: 'config',
+      name: '配置参数',
+      description: '设置评价参数',
+      icon: Setting
+    },
+    {
+      id: 'generate',
+      name: '生成报告',
+      description: '生成等级评价报告',
+      icon: DocIcon
+    }
+  ]
+}
+
+// 当前专题的操作列表
+const currentActions = computed(() => {
+  return selectedTopic.value ? topicActions[selectedTopic.value] || [] : []
+})
 
 // 计算当前可选的专题
 const currentTopics = computed(() => {
@@ -441,29 +533,29 @@ const currentTopics = computed(() => {
 })
 
 // 选择大类
-const selectCategory = (id) => {
+const selectCategory = async (id) => {
   selectedCategory.value = id
   selectedTopic.value = null
   selectedRegion.value = null
-  regions.value = []
-}
-
-// 选择专题
-const selectTopic = async (id) => {
-  selectedTopic.value = id
-  selectedRegion.value = null
+  // 选择大类后立即加载该大类下的所有地区
   await loadRegions()
 }
 
-// 加载地区列表
+// 选择专题
+const selectTopic = (id) => {
+  selectedTopic.value = id
+  selectedRegion.value = null
+  // 地区列表已在选择大类时加载，这里不需要再加载
+}
+
+// 加载地区列表 - 地区按大类共享，不再按专题区分
 const loadRegions = async () => {
-  if (!selectedCategory.value || !selectedTopic.value) return
+  if (!selectedCategory.value) return
 
   loadingRegions.value = true
   try {
     const data = await getRegions({
-      category: selectedCategory.value,
-      topic: selectedTopic.value
+      category: selectedCategory.value
     })
     regions.value = data.regions || []
   } catch (error) {
@@ -511,11 +603,10 @@ const handleCreateRegion = async () => {
     const countyName = createForm.value.county
     const fullName = `${provinceName}${cityName}${countyName}`
 
+    // 地区按大类共享，不再绑定到具体专题
     const newRegion = await createRegion({
       name: fullName,
       category: selectedCategory.value,
-      topic: selectedTopic.value,
-      item: selectedTopic.value,
       province: createForm.value.province,
       city: createForm.value.city,
       county: countyName
@@ -564,6 +655,9 @@ const handleAction = (actionId) => {
     case 'attribute-process':
       router.push('/attribute-process')
       break
+    case 'data-report':
+      router.push('/data-report')
+      break
     case 'upload':
       router.push('/upload')
       break
@@ -584,7 +678,8 @@ const recentTools = ref([])
 
 // 添加最近使用的工具
 const addRecentTool = (toolId) => {
-  const tool = actions.find(a => a.id === toolId)
+  // 从当前专题的操作列表中查找
+  const tool = currentActions.value.find(a => a.id === toolId)
   if (!tool) return
 
   // 移除已存在的相同工具
@@ -669,8 +764,8 @@ onMounted(async () => {
     healthStatus.value = 'error'
   }
 
-  // 恢复已有选择状态时，重新加载地区列表
-  if (selectedCategory.value && selectedTopic.value) {
+  // 恢复已有选择状态时，重新加载地区列表（只需要大类即可）
+  if (selectedCategory.value) {
     await loadRegions()
   }
 })

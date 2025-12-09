@@ -255,4 +255,161 @@ export const testAIConfig = (configId) => api.post(`/ai-config/${configId}/test`
  */
 export const getDefaultAIConfig = () => api.get('/ai-config/default/current')
 
+// ============ 数据报告 API ============
+
+/**
+ * 生成数据报告（Excel）
+ * @param {string[]} mappingFiles - 制图数据文件路径列表
+ * @param {string[]} sampleFiles - 样点数据文件路径列表
+ */
+export const generateDataReport = (mappingFiles, sampleFiles) =>
+  api.post('/report/data-report', {
+    mapping_files: mappingFiles,
+    sample_files: sampleFiles
+  }, { timeout: 300000 })
+
+// ============ 分级标准 API ============
+
+/**
+ * 获取所有可用的分级标准列表
+ */
+export const getGradingStandards = () => api.get('/grading/standards')
+
+/**
+ * 获取当前使用的分级标准
+ */
+export const getCurrentGradingStandard = () => api.get('/grading/standards/current')
+
+/**
+ * 设置当前使用的分级标准
+ * @param {string} standardId - 分级标准ID
+ */
+export const setCurrentGradingStandard = (standardId) =>
+  api.post('/grading/standards/current', { standard_id: standardId })
+
+/**
+ * 获取指定分级标准的详细配置
+ * @param {string} standardId - 分级标准ID
+ */
+export const getGradingStandardDetail = (standardId) =>
+  api.get(`/grading/standards/${standardId}`)
+
+/**
+ * 获取当前分级标准的属性配置
+ */
+export const getCurrentGradingAttributes = () => api.get('/grading/attributes')
+
+// ============ 专题配置管理 API ============
+
+/**
+ * 获取专题下的所有配置列表
+ * @param {string} topic - 专题ID
+ */
+export const getTopicConfigs = (topic) => api.get(`/topic-config/${topic}`)
+
+/**
+ * 获取专题-地区配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ */
+export const getTopicConfig = (topic, regionId) =>
+  api.get(`/topic-config/${topic}/${regionId}`)
+
+/**
+ * 创建或获取专题-地区配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {string} regionName - 地区名称
+ */
+export const createOrGetTopicConfig = (topic, regionId, regionName) =>
+  api.post(`/topic-config/${topic}/${regionId}`, {
+    topic,
+    region_id: regionId,
+    region_name: regionName
+  })
+
+/**
+ * 删除专题-地区配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ */
+export const deleteTopicConfig = (topic, regionId) =>
+  api.delete(`/topic-config/${topic}/${regionId}`)
+
+/**
+ * 更新基础配置（年份等）
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {object} data - 基础配置数据
+ */
+export const updateTopicBaseConfig = (topic, regionId, data) =>
+  api.put(`/topic-config/${topic}/${regionId}/base`, data)
+
+/**
+ * 更新分级标准
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {string} gradingStandard - 分级标准ID
+ */
+export const updateTopicGradingStandard = (topic, regionId, gradingStandard) =>
+  api.put(`/topic-config/${topic}/${regionId}/grading-standard`, {
+    grading_standard: gradingStandard
+  })
+
+/**
+ * 更新属性图数据处理配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {object} data - 数据处理配置
+ */
+export const updateAttributeMapDataConfig = (topic, regionId, data) =>
+  api.put(`/topic-config/${topic}/${regionId}/attribute-map/data`, data)
+
+/**
+ * 更新属性图上图配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {object} data - 上图配置
+ */
+export const updateAttributeMapMappingConfig = (topic, regionId, data) =>
+  api.put(`/topic-config/${topic}/${regionId}/attribute-map/mapping`, data)
+
+/**
+ * 更新属性图统计配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {object} data - 统计配置
+ */
+export const updateAttributeMapStatsConfig = (topic, regionId, data) =>
+  api.put(`/topic-config/${topic}/${regionId}/attribute-map/stats`, data)
+
+// ============ 数据报告专题配置 API ============
+
+/**
+ * 更新数据报告数据处理配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {object} data - 数据处理配置
+ */
+export const updateDataReportDataConfig = (topic, regionId, data) =>
+  api.put(`/topic-config/${topic}/${regionId}/data-report/data`, data)
+
+/**
+ * 更新数据报告统计配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {object} data - 统计配置
+ */
+export const updateDataReportStatsConfig = (topic, regionId, data) =>
+  api.put(`/topic-config/${topic}/${regionId}/data-report/stats`, data)
+
+/**
+ * 更新数据报告输出配置
+ * @param {string} topic - 专题ID
+ * @param {number} regionId - 地区ID
+ * @param {object} data - 输出配置
+ */
+export const updateDataReportOutputConfig = (topic, regionId, data) =>
+  api.put(`/topic-config/${topic}/${regionId}/data-report/output`, data)
+
 export default api

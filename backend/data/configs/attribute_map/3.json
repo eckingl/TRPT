@@ -1,0 +1,1038 @@
+{
+  "topic": "attribute_map",
+  "region_id": 3,
+  "region_name": "江苏省南京市/",
+  "survey_year": 2024,
+  "historical_year": null,
+  "updated_at": "2025-12-09T19:51:00.761610",
+  "attribute_map": {
+    "grading_standard": "jiangsu",
+    "attributes": {
+      "SRXYZL": {
+        "name": "水溶性盐总量",
+        "unit": "g/kg",
+        "reverse_display": false,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 1.0,
+            "level": "1级",
+            "description": "无盐化"
+          },
+          {
+            "threshold": 2.0,
+            "level": "2级",
+            "description": "轻度盐化"
+          },
+          {
+            "threshold": 4.0,
+            "level": "3级",
+            "description": "中度盐化"
+          },
+          {
+            "threshold": 6.0,
+            "level": "4级",
+            "description": "重度盐化"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "5级",
+            "description": "盐土"
+          }
+        ]
+      },
+      "DDL": {
+        "name": "电导率",
+        "unit": "mS/cm",
+        "reverse_display": false,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 0.4,
+            "level": "1级",
+            "description": "低"
+          },
+          {
+            "threshold": 0.8,
+            "level": "2级",
+            "description": "较低"
+          },
+          {
+            "threshold": 1.6,
+            "level": "3级",
+            "description": "中"
+          },
+          {
+            "threshold": 2.4,
+            "level": "4级",
+            "description": "较高"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "5级",
+            "description": "高"
+          }
+        ]
+      },
+      "ENA": {
+        "name": "交换性钠",
+        "unit": "cmol(+)/kg",
+        "reverse_display": false,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 0.2,
+            "level": "1级",
+            "description": "低"
+          },
+          {
+            "threshold": 0.5,
+            "level": "2级",
+            "description": "较低"
+          },
+          {
+            "threshold": 0.8,
+            "level": "3级",
+            "description": "中"
+          },
+          {
+            "threshold": 1.2,
+            "level": "4级",
+            "description": "较高"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "5级",
+            "description": "高"
+          }
+        ]
+      },
+      "TRRZPJZ": {
+        "name": "土壤容重",
+        "unit": "g/cm³",
+        "reverse_display": false,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 0.9,
+            "level": "1级",
+            "description": "不适宜"
+          },
+          {
+            "threshold": 1.1,
+            "level": "2级",
+            "description": "较适宜"
+          },
+          {
+            "threshold": 1.35,
+            "level": "3级",
+            "description": "适宜"
+          },
+          {
+            "threshold": 1.55,
+            "level": "4级",
+            "description": "较适宜"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "5级",
+            "description": "不适宜"
+          }
+        ]
+      },
+      "GZCHD": {
+        "name": "耕作层厚度",
+        "unit": "cm",
+        "reverse_display": true,
+        "land_filter": "cultivated_only",
+        "levels": [
+          {
+            "threshold": 10.0,
+            "level": "5级",
+            "description": "薄"
+          },
+          {
+            "threshold": 15.0,
+            "level": "4级",
+            "description": "较薄"
+          },
+          {
+            "threshold": 20.0,
+            "level": "3级",
+            "description": "中"
+          },
+          {
+            "threshold": 25.0,
+            "level": "2级",
+            "description": "较厚"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "厚"
+          }
+        ]
+      },
+      "SWXDTJT7": {
+        "name": "水稳性大团聚体",
+        "unit": "mg/kg",
+        "reverse_display": false,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 10.0,
+            "level": "1级",
+            "description": "低"
+          },
+          {
+            "threshold": 20.0,
+            "level": "2级",
+            "description": "较低"
+          },
+          {
+            "threshold": 30.0,
+            "level": "3级",
+            "description": "中"
+          },
+          {
+            "threshold": 40.0,
+            "level": "4级",
+            "description": "较高"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "5级",
+            "description": "高"
+          }
+        ]
+      },
+      "OM": {
+        "name": "有机质",
+        "unit": "g/kg",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 10.0,
+            "level": "5级",
+            "description": "低"
+          },
+          {
+            "threshold": 20.0,
+            "level": "4级",
+            "description": "较低"
+          },
+          {
+            "threshold": 30.0,
+            "level": "3级",
+            "description": "中"
+          },
+          {
+            "threshold": 40.0,
+            "level": "2级",
+            "description": "较高"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "高"
+          }
+        ]
+      },
+      "TN": {
+        "name": "全氮",
+        "unit": "g/kg",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 0.5,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 1.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 1.5,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 2.0,
+            "level": "2级",
+            "description": "较丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "丰富"
+          }
+        ]
+      },
+      "TP": {
+        "name": "全磷",
+        "unit": "g/kg",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 0.4,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 0.6,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 0.8,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 1.0,
+            "level": "2级",
+            "description": "较丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "丰富"
+          }
+        ]
+      },
+      "TK": {
+        "name": "全钾",
+        "unit": "g/kg",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 10.0,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 15.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 20.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 25.0,
+            "level": "2级",
+            "description": "较丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "丰富"
+          }
+        ]
+      },
+      "AP": {
+        "name": "有效磷",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 5.0,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 10.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 20.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 40.0,
+            "level": "2级",
+            "description": "较丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "丰富"
+          }
+        ]
+      },
+      "AK": {
+        "name": "速效钾",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 50.0,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 100.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 150.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 200.0,
+            "level": "2级",
+            "description": "较丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "丰富"
+          }
+        ]
+      },
+      "SK": {
+        "name": "缓效钾",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 100.0,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 300.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 500.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 700.0,
+            "level": "2级",
+            "description": "较丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "丰富"
+          }
+        ]
+      },
+      "CEC": {
+        "name": "阳离子交换量",
+        "unit": "cmol(+)/kg",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 5.0,
+            "level": "5级",
+            "description": "低"
+          },
+          {
+            "threshold": 10.0,
+            "level": "4级",
+            "description": "较低"
+          },
+          {
+            "threshold": 15.0,
+            "level": "3级",
+            "description": "中"
+          },
+          {
+            "threshold": 20.0,
+            "level": "2级",
+            "description": "较高"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "高"
+          }
+        ]
+      },
+      "ECA": {
+        "name": "交换性钙",
+        "unit": "cmol(1/2Ca²⁺)/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 1.0,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 4.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 10.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 15.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "EMG": {
+        "name": "交换性镁",
+        "unit": "cmol(1/2Mg²⁺)/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 0.5,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 1.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 1.5,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 2.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "EK": {
+        "name": "交换性钾",
+        "unit": "cmol(+)/kg",
+        "reverse_display": false,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 0.1,
+            "level": "1级",
+            "description": "无效钾"
+          },
+          {
+            "threshold": 0.2,
+            "level": "2级",
+            "description": "低效钾"
+          },
+          {
+            "threshold": 0.4,
+            "level": "3级",
+            "description": "中效钾"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "4级",
+            "description": "高效钾"
+          }
+        ]
+      },
+      "JHXYJZL": {
+        "name": "交换性盐基总量",
+        "unit": "cmol(+)/kg",
+        "reverse_display": false,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 5.0,
+            "level": "1级",
+            "description": "低"
+          },
+          {
+            "threshold": 10.0,
+            "level": "2级",
+            "description": "较低"
+          },
+          {
+            "threshold": 15.0,
+            "level": "3级",
+            "description": "中"
+          },
+          {
+            "threshold": 20.0,
+            "level": "4级",
+            "description": "较高"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "5级",
+            "description": "高"
+          }
+        ]
+      },
+      "AS1": {
+        "name": "有效硫",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 10.0,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 20.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 30.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 40.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "ASI": {
+        "name": "有效硅",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "paddy_only",
+        "levels": [
+          {
+            "threshold": 50.0,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 100.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 150.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 250.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "AFE": {
+        "name": "有效铁",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 2.5,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 4.5,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 10.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 20.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "AMN": {
+        "name": "有效锰",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 1.0,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 5.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 15.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 30.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "ACU": {
+        "name": "有效铜",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 0.2,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 0.5,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 1.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 2.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "AZN": {
+        "name": "有效锌",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 0.5,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 1.0,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 2.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 3.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "AB": {
+        "name": "有效硼",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 0.2,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 0.5,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 1.0,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 2.0,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "AMO": {
+        "name": "有效钼",
+        "unit": "mg/kg",
+        "reverse_display": true,
+        "land_filter": "cultivated_garden",
+        "levels": [
+          {
+            "threshold": 0.1,
+            "level": "5级",
+            "description": "极缺"
+          },
+          {
+            "threshold": 0.15,
+            "level": "4级",
+            "description": "缺乏"
+          },
+          {
+            "threshold": 0.2,
+            "level": "3级",
+            "description": "中等"
+          },
+          {
+            "threshold": 0.3,
+            "level": "2级",
+            "description": "丰富"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "偏高"
+          }
+        ]
+      },
+      "ph": {
+        "name": "pH",
+        "unit": "",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 4.5,
+            "level": "1级",
+            "description": "强酸性"
+          },
+          {
+            "threshold": 5.5,
+            "level": "2级",
+            "description": "酸性"
+          },
+          {
+            "threshold": 6.5,
+            "level": "3级",
+            "description": "弱酸性"
+          },
+          {
+            "threshold": 7.5,
+            "level": "4级",
+            "description": "中性"
+          },
+          {
+            "threshold": 8.5,
+            "level": "5级",
+            "description": "弱碱性"
+          },
+          {
+            "threshold": 9.0,
+            "level": "6级",
+            "description": "碱性"
+          },
+          {
+            "threshold": 14.0,
+            "level": "7级",
+            "description": "强碱性"
+          }
+        ]
+      },
+      "sand": {
+        "name": "机械组成-砂粒",
+        "unit": "%",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 15.0,
+            "level": "5级",
+            "description": "≤15"
+          },
+          {
+            "threshold": 25.0,
+            "level": "4级",
+            "description": "15～25"
+          },
+          {
+            "threshold": 45.0,
+            "level": "3级",
+            "description": "25～45"
+          },
+          {
+            "threshold": 65.0,
+            "level": "2级",
+            "description": "45～65"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "65～100"
+          }
+        ]
+      },
+      "silt": {
+        "name": "机械组成-粉粒",
+        "unit": "%",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 15.0,
+            "level": "5级",
+            "description": "≤15"
+          },
+          {
+            "threshold": 25.0,
+            "level": "4级",
+            "description": "15～25"
+          },
+          {
+            "threshold": 45.0,
+            "level": "3级",
+            "description": "25～45"
+          },
+          {
+            "threshold": 65.0,
+            "level": "2级",
+            "description": "45～65"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "65～100"
+          }
+        ]
+      },
+      "clay": {
+        "name": "机械组成-黏粒",
+        "unit": "%",
+        "reverse_display": true,
+        "land_filter": "",
+        "levels": [
+          {
+            "threshold": 15.0,
+            "level": "5级",
+            "description": "≤15"
+          },
+          {
+            "threshold": 25.0,
+            "level": "4级",
+            "description": "15～25"
+          },
+          {
+            "threshold": 45.0,
+            "level": "3级",
+            "description": "25～45"
+          },
+          {
+            "threshold": 65.0,
+            "level": "2级",
+            "description": "45～65"
+          },
+          {
+            "threshold": 999999.0,
+            "level": "1级",
+            "description": "65～100"
+          }
+        ]
+      }
+    },
+    "data_process": {
+      "enabled_attributes": [],
+      "area_column": "面积",
+      "town_column": "XZQMC",
+      "land_use_column": "TDLYLX"
+    },
+    "mapping": {
+      "color_scheme": "default",
+      "legend_position": "bottom_right",
+      "show_labels": true
+    },
+    "stats": {
+      "include_town_stats": true,
+      "include_land_use_stats": true,
+      "include_soil_type_stats": true,
+      "percentile_list": [
+        2,
+        5,
+        10,
+        20,
+        80,
+        90,
+        95,
+        98
+      ]
+    }
+  },
+  "type_map": null,
+  "suitability": null,
+  "grade_eval": null,
+  "data_report": null
+}

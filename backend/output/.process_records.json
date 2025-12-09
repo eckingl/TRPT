@@ -1715,5 +1715,485 @@
     "excel_filename": "属性图数据处理_20251208_014601.xlsx",
     "excel_path": "C:\\Users\\ECKin\\Desktop\\TRPC\\backend\\output\\属性图数据处理_20251208_014601.xlsx",
     "created_at": "2025-12-08T01:46:01.974758"
+  },
+  {
+    "process_id": "0b59e75e",
+    "sample_files": [
+      "1117濮阳合并区样点数2据_20251209_185747.csv"
+    ],
+    "area_files": [
+      "1117濮阳合并区样点数2据_20251209_185747.csv"
+    ],
+    "sample_file_paths": [
+      "C:\\Users\\ECKin\\Desktop\\TRPC\\backend\\uploads\\1117濮阳合并区样点数2据_20251209_185747.csv"
+    ],
+    "area_file_paths": [
+      "C:\\Users\\ECKin\\Desktop\\TRPC\\backend\\uploads\\1117濮阳合并区样点数2据_20251209_185747.csv"
+    ],
+    "preview": [
+      {
+        "key": "ph",
+        "name": "pH",
+        "unit": "",
+        "sample_count": 197,
+        "sample_mean": 8.53,
+        "sample_min": 2.0,
+        "sample_max": 9.21,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 0.0,
+          "Ⅲ级": 0.0,
+          "Ⅳ级": 0.7,
+          "Ⅴ级": 43.7,
+          "Ⅵ级": 53.3,
+          "Ⅶ级": 2.3
+        }
+      },
+      {
+        "key": "CEC",
+        "name": "阳离子交换量",
+        "unit": "cmol(+)/kg",
+        "sample_count": 199,
+        "sample_mean": 10.23,
+        "sample_min": 3.52,
+        "sample_max": 24.4,
+        "grade_distribution": {
+          "Ⅰ级": 1.7,
+          "Ⅱ级": 3.1,
+          "Ⅲ级": 37.1,
+          "Ⅳ级": 56.0,
+          "Ⅴ级": 2.2
+        }
+      },
+      {
+        "key": "JHXYJZL",
+        "name": "交换性盐基总量",
+        "unit": "cmol(+)/kg",
+        "sample_count": 199,
+        "sample_mean": 8.83,
+        "sample_min": 3.12,
+        "sample_max": 20.1,
+        "grade_distribution": {
+          "Ⅰ级": 4.5,
+          "Ⅱ级": 68.8,
+          "Ⅲ级": 24.3,
+          "Ⅳ级": 2.2,
+          "Ⅴ级": 0.2
+        }
+      },
+      {
+        "key": "ECA",
+        "name": "交换性钙",
+        "unit": "cmol(1/2Ca²⁺)/kg",
+        "sample_count": 199,
+        "sample_mean": 5.84,
+        "sample_min": 2.63,
+        "sample_max": 12.8,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 2.2,
+          "Ⅲ级": 79.9,
+          "Ⅳ级": 17.9,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "EMG",
+        "name": "交换性镁",
+        "unit": "cmol(1/2Mg²⁺)/kg",
+        "sample_count": 199,
+        "sample_mean": 2.53,
+        "sample_min": 0.39,
+        "sample_max": 8.12,
+        "grade_distribution": {
+          "Ⅰ级": 64.8,
+          "Ⅱ级": 24.2,
+          "Ⅲ级": 9.1,
+          "Ⅳ级": 1.3,
+          "Ⅴ级": 0.6
+        }
+      },
+      {
+        "key": "ENA",
+        "name": "交换性钠",
+        "unit": "cmol(+)/kg",
+        "sample_count": 199,
+        "sample_mean": 0.24,
+        "sample_min": 0.01,
+        "sample_max": 1.2,
+        "grade_distribution": {
+          "Ⅰ级": 63.8,
+          "Ⅱ级": 24.2,
+          "Ⅲ级": 9.1,
+          "Ⅳ级": 2.9,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "EK",
+        "name": "交换性钾",
+        "unit": "cmol(+)/kg",
+        "sample_count": 198,
+        "sample_mean": 0.24,
+        "sample_min": 0.1,
+        "sample_max": 0.7,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 40.6,
+          "Ⅲ级": 54.2,
+          "Ⅳ级": 5.2,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "SRXYZL",
+        "name": "水溶性盐总量",
+        "unit": "g/kg",
+        "sample_count": 191,
+        "sample_mean": 0.6,
+        "sample_min": 0.23,
+        "sample_max": 1.77,
+        "grade_distribution": {
+          "Ⅰ级": 95.2,
+          "Ⅱ级": 4.8,
+          "Ⅲ级": 0.0,
+          "Ⅳ级": 0.0,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "DDL",
+        "name": "电导率",
+        "unit": "mS/cm",
+        "sample_count": 191,
+        "sample_mean": 0.14,
+        "sample_min": 0.04,
+        "sample_max": 0.45,
+        "grade_distribution": {
+          "Ⅰ级": 99.5,
+          "Ⅱ级": 0.5,
+          "Ⅲ级": 0.0,
+          "Ⅳ级": 0.0,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "OM",
+        "name": "有机质",
+        "unit": "g/kg",
+        "sample_count": 199,
+        "sample_mean": 12.24,
+        "sample_min": 2.09,
+        "sample_max": 30.9,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 0.1,
+          "Ⅲ级": 1.8,
+          "Ⅳ级": 66.6,
+          "Ⅴ级": 31.4
+        }
+      },
+      {
+        "key": "TN",
+        "name": "全氮",
+        "unit": "g/kg",
+        "sample_count": 199,
+        "sample_mean": 0.81,
+        "sample_min": 0.14,
+        "sample_max": 1.98,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 1.2,
+          "Ⅲ级": 16.7,
+          "Ⅳ级": 71.9,
+          "Ⅴ级": 10.1
+        }
+      },
+      {
+        "key": "TP",
+        "name": "全磷",
+        "unit": "g/kg",
+        "sample_count": 199,
+        "sample_mean": 0.88,
+        "sample_min": 0.52,
+        "sample_max": 1.77,
+        "grade_distribution": {
+          "Ⅰ级": 14.6,
+          "Ⅱ级": 43.5,
+          "Ⅲ级": 39.8,
+          "Ⅳ级": 2.1,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "TK",
+        "name": "全钾",
+        "unit": "g/kg",
+        "sample_count": 199,
+        "sample_mean": 19.44,
+        "sample_min": 15.2,
+        "sample_max": 27.0,
+        "grade_distribution": {
+          "Ⅰ级": 1.0,
+          "Ⅱ级": 44.3,
+          "Ⅲ级": 54.7,
+          "Ⅳ级": 0.0,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "AP",
+        "name": "有效磷",
+        "unit": "mg/kg",
+        "sample_count": 197,
+        "sample_mean": 20.01,
+        "sample_min": 1.65,
+        "sample_max": 86.0,
+        "grade_distribution": {
+          "Ⅰ级": 9.4,
+          "Ⅱ级": 15.3,
+          "Ⅲ级": 34.6,
+          "Ⅳ级": 18.9,
+          "Ⅴ级": 21.7
+        }
+      },
+      {
+        "key": "SK",
+        "name": "缓效钾",
+        "unit": "mg/kg",
+        "sample_count": 192,
+        "sample_mean": 758.78,
+        "sample_min": 296.0,
+        "sample_max": 1346.0,
+        "grade_distribution": {
+          "Ⅰ级": 56.5,
+          "Ⅱ级": 36.3,
+          "Ⅲ级": 6.6,
+          "Ⅳ级": 0.6,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "AK",
+        "name": "速效钾",
+        "unit": "mg/kg",
+        "sample_count": 199,
+        "sample_mean": 101.85,
+        "sample_min": 35.2,
+        "sample_max": 406.0,
+        "grade_distribution": {
+          "Ⅰ级": 4.0,
+          "Ⅱ级": 10.3,
+          "Ⅲ级": 26.3,
+          "Ⅳ级": 51.4,
+          "Ⅴ级": 8.0
+        }
+      },
+      {
+        "key": "AS1",
+        "name": "有效硫",
+        "unit": "mg/kg",
+        "sample_count": 191,
+        "sample_mean": 12.52,
+        "sample_min": 0.44,
+        "sample_max": 166.0,
+        "grade_distribution": {
+          "Ⅰ级": 4.9,
+          "Ⅱ级": 2.2,
+          "Ⅲ级": 6.6,
+          "Ⅳ级": 19.0,
+          "Ⅴ级": 67.4
+        }
+      },
+      {
+        "key": "ASI",
+        "name": "有效硅",
+        "unit": "mg/kg",
+        "sample_count": 0,
+        "sample_mean": 0.0,
+        "sample_min": 0.0,
+        "sample_max": 0.0,
+        "grade_distribution": {}
+      },
+      {
+        "key": "AFE",
+        "name": "有效铁",
+        "unit": "mg/kg",
+        "sample_count": 191,
+        "sample_mean": 10.23,
+        "sample_min": 4.28,
+        "sample_max": 27.1,
+        "grade_distribution": {
+          "Ⅰ级": 1.8,
+          "Ⅱ级": 25.4,
+          "Ⅲ级": 70.3,
+          "Ⅳ级": 2.5,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "AMN",
+        "name": "有效锰",
+        "unit": "mg/kg",
+        "sample_count": 191,
+        "sample_mean": 14.05,
+        "sample_min": 3.83,
+        "sample_max": 37.0,
+        "grade_distribution": {
+          "Ⅰ级": 0.3,
+          "Ⅱ级": 21.1,
+          "Ⅲ级": 77.2,
+          "Ⅳ级": 1.4,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "ACU",
+        "name": "有效铜",
+        "unit": "mg/kg",
+        "sample_count": 190,
+        "sample_mean": 1.4,
+        "sample_min": 0.02,
+        "sample_max": 10.8,
+        "grade_distribution": {
+          "Ⅰ级": 8.8,
+          "Ⅱ级": 41.8,
+          "Ⅲ级": 39.0,
+          "Ⅳ级": 8.9,
+          "Ⅴ级": 1.4
+        }
+      },
+      {
+        "key": "AZN",
+        "name": "有效锌",
+        "unit": "mg/kg",
+        "sample_count": 190,
+        "sample_mean": 1.59,
+        "sample_min": 0.2,
+        "sample_max": 10.3,
+        "grade_distribution": {
+          "Ⅰ级": 9.0,
+          "Ⅱ级": 6.2,
+          "Ⅲ级": 26.7,
+          "Ⅳ级": 43.9,
+          "Ⅴ级": 14.2
+        }
+      },
+      {
+        "key": "AB",
+        "name": "有效硼",
+        "unit": "mg/kg",
+        "sample_count": 192,
+        "sample_mean": 0.55,
+        "sample_min": 0.06,
+        "sample_max": 1.49,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 3.5,
+          "Ⅲ级": 42.1,
+          "Ⅳ级": 53.1,
+          "Ⅴ级": 1.3
+        }
+      },
+      {
+        "key": "AMO",
+        "name": "有效钼",
+        "unit": "mg/kg",
+        "sample_count": 192,
+        "sample_mean": 0.08,
+        "sample_min": 0.01,
+        "sample_max": 0.23,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 1.3,
+          "Ⅲ级": 5.2,
+          "Ⅳ级": 15.9,
+          "Ⅴ级": 77.6
+        }
+      },
+      {
+        "key": "TRRZPJZ",
+        "name": "土壤容重",
+        "unit": "g/cm³",
+        "sample_count": 199,
+        "sample_mean": 1.39,
+        "sample_min": 1.08,
+        "sample_max": 1.69,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 0.6,
+          "Ⅲ级": 25.4,
+          "Ⅳ级": 66.9,
+          "Ⅴ级": 7.0
+        }
+      },
+      {
+        "key": "sand",
+        "name": "机械组成-砂粒",
+        "unit": "%",
+        "sample_count": 101,
+        "sample_mean": 70.35,
+        "sample_min": 22.2,
+        "sample_max": 94.1,
+        "grade_distribution": {
+          "Ⅰ级": 54.7,
+          "Ⅱ级": 34.2,
+          "Ⅲ级": 9.1,
+          "Ⅳ级": 2.0,
+          "Ⅴ级": 0.0
+        }
+      },
+      {
+        "key": "silt",
+        "name": "机械组成-粉粒",
+        "unit": "%",
+        "sample_count": 101,
+        "sample_mean": 17.99,
+        "sample_min": 2.0,
+        "sample_max": 53.0,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 2.0,
+          "Ⅲ级": 41.0,
+          "Ⅳ级": 23.9,
+          "Ⅴ级": 33.1
+        }
+      },
+      {
+        "key": "clay",
+        "name": "机械组成-黏粒",
+        "unit": "%",
+        "sample_count": 101,
+        "sample_mean": 11.66,
+        "sample_min": 1.9,
+        "sample_max": 33.1,
+        "grade_distribution": {
+          "Ⅰ级": 0.0,
+          "Ⅱ级": 0.0,
+          "Ⅲ级": 4.5,
+          "Ⅳ级": 34.2,
+          "Ⅴ级": 61.3
+        }
+      },
+      {
+        "key": "GZCHD",
+        "name": "耕作层厚度",
+        "unit": "cm",
+        "sample_count": 199,
+        "sample_mean": 99.15,
+        "sample_min": 1.0,
+        "sample_max": 199.0,
+        "grade_distribution": {
+          "Ⅰ级": 98.5,
+          "Ⅱ级": 0.6,
+          "Ⅲ级": 0.4,
+          "Ⅳ级": 0.3,
+          "Ⅴ级": 0.2
+        }
+      }
+    ],
+    "excel_filename": "属性图数据处理_20251209_193245.xlsx",
+    "excel_path": "C:\\Users\\ECKin\\Desktop\\TRPC\\backend\\output\\属性图数据处理_20251209_193245.xlsx",
+    "created_at": "2025-12-09T19:32:45.567005"
   }
 ]

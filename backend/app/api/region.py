@@ -13,8 +13,8 @@ class RegionCreate(BaseModel):
 
     name: str = Field(..., min_length=1, description="地区名称")
     category: str = Field(..., description="大类")
-    topic: str = Field(..., description="专题")
-    item: str = Field(..., description="具体项目")
+    topic: str | None = Field(None, description="专题（可选）")
+    item: str | None = Field(None, description="具体项目（可选）")
     province: str | None = Field(None, description="省份代码")
     city: str | None = Field(None, description="市代码")
     county: str | None = Field(None, description="县/区名称")
